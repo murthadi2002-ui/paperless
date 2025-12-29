@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { ChevronRight, Calendar, Hash, User, Building2, Tag, FileText, Download, Info, MoreVertical, Trash2, PlusCircle, Paperclip, Check } from 'lucide-react';
+import { ChevronRight, Calendar, Hash, User, Building2, Tag, FileText, Download, Info, MoreVertical, Trash2, PlusCircle, Paperclip, Check, FileSpreadsheet, FileImage, FileCode, FileQuestion } from 'lucide-react';
 import { Document, Attachment } from '../types';
 
 interface DocumentDetailsViewProps {
@@ -10,6 +10,23 @@ interface DocumentDetailsViewProps {
   onDelete: () => void;
   onAddAttachment: (file: Attachment) => void;
 }
+
+const getFileInfo = (fileName: string, type: string) => {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  if (type.includes('pdf') || ext === 'pdf') {
+    return { icon: FileText, color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-100', hover: 'hover:border-blue-400' };
+  }
+  if (type.includes('image') || ['jpg', 'jpeg', 'png', 'svg'].includes(ext || '')) {
+    return { icon: FileImage, color: 'text-rose-700', bg: 'bg-rose-50', border: 'border-rose-100', hover: 'hover:border-rose-400' };
+  }
+  if (ext?.match(/xls|xlsx|csv/)) {
+    return { icon: FileSpreadsheet, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-100', hover: 'hover:border-emerald-400' };
+  }
+  if (ext?.match(/doc|docx/)) {
+    return { icon: FileText, color: 'text-indigo-700', bg: 'bg-indigo-50', border: 'border-indigo-100', hover: 'hover:border-indigo-400' };
+  }
+  return { icon: FileQuestion, color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-100', hover: 'hover:border-slate-400' };
+};
 
 const DownloadButton: React.FC<{ file: Attachment, autoOpen: boolean }> = ({ file, autoOpen }) => {
   const [downloading, setDownloading] = useState(false);
@@ -35,7 +52,6 @@ const DownloadButton: React.FC<{ file: Attachment, autoOpen: boolean }> = ({ fil
           setDownloading(false);
           setCompleted(true);
           
-          // Open in new tab only if autoOpen is enabled
           if (autoOpen) {
             window.open(file.url, '_blank');
           }
@@ -105,7 +121,6 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({ doc, autoOpen
   const downloadAll = () => {
     doc.attachments.forEach((file, index) => {
       setTimeout(() => {
-        // Only download, never open when using "Download All"
         const link = document.createElement('a');
         link.href = file.url;
         link.download = file.name;
@@ -201,20 +216,24 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({ doc, autoOpen
                </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               {doc.attachments.map((file) => (
-                 <div key={file.id} className="group bg-slate-50 p-5 rounded-3xl border border-slate-100 hover:border-emerald-300 hover:bg-white transition-all flex flex-col shadow-sm hover:shadow-xl relative overflow-hidden">
-                    <div className="flex items-start justify-between mb-4">
-                       <div className="p-3 bg-white rounded-2xl text-emerald-600 shadow-sm transition-colors group-hover:bg-emerald-600 group-hover:text-white">
-                         <FileText size={24} />
-                       </div>
-                       <DownloadButton file={file} autoOpen={autoOpenFiles} />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-bold text-slate-800 text-sm truncate mb-1">{file.name}</h4>
-                      <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">{file.size}</p>
-                    </div>
-                 </div>
-               ))}
+               {doc.attachments.map((file) => {
+                 const info = getFileInfo(file.name, file.type);
+                 const Icon = info.icon;
+                 return (
+                   <div key={file.id} className={`group bg-slate-50 p-5 rounded-3xl border ${info.border} ${info.hover} hover:bg-white transition-all flex flex-col shadow-sm hover:shadow-xl relative overflow-hidden`}>
+                      <div className="flex items-start justify-between mb-4">
+                         <div className={`p-3 rounded-2xl shadow-sm transition-all group-hover:scale-110 ${info.bg} ${info.color}`}>
+                           <Icon size={24} />
+                         </div>
+                         <DownloadButton file={file} autoOpen={autoOpenFiles} />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-slate-800 text-sm truncate mb-1">{file.name}</h4>
+                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">{file.size}</p>
+                      </div>
+                   </div>
+                 );
+               })}
                {doc.attachments.length === 0 && (
                  <div className="col-span-full py-20 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100 flex flex-col items-center">
                    <Paperclip size={48} className="text-slate-200 mb-4" />

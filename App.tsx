@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import DocumentList from './components/DocumentList';
@@ -34,7 +34,7 @@ const App: React.FC = () => {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
 
   // Confirmation Modals State
-  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string; type: 'doc' | 'folder' }>({ isOpen: false, id: '', type: 'doc' });
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string; type: 'doc' | 'folder' | 'project' }>({ isOpen: false, id: '', type: 'doc' });
   const [confirmRestore, setConfirmRestore] = useState<{ isOpen: boolean; item: any; type: 'doc' | 'folder' }>({ isOpen: false, item: null, type: 'doc' });
 
   // Actions
@@ -47,15 +47,41 @@ const App: React.FC = () => {
     setActiveView('details');
   };
 
-  const handleAddAttachmentToDoc = (attachment: Attachment) => {
-    if (!currentDocument) return;
-    const updatedDocs = documents.map(d => 
-      d.id === currentDocument.id 
-      ? { ...d, attachments: [...d.attachments, attachment] } 
-      : d
-    );
-    setDocuments(updatedDocs);
-    setCurrentDocument(updatedDocs.find(d => d.id === currentDocument.id) || null);
+  const handleTogglePin = (id: string) => {
+    setDocuments(prev => prev.map(d => d.id === id ? { ...d, isPinned: !d.isPinned } : d));
+  };
+
+  const handleDuplicateDoc = (doc: Document) => {
+    const newDoc = {
+      ...doc,
+      id: Math.random().toString(36).substr(2, 9),
+      subject: `${doc.subject} (نسخة مكررة)`,
+      refNumber: `${doc.refNumber}-نسخة`,
+      date: new Date().toISOString().split('T')[0],
+      isPinned: false
+    };
+    setDocuments([newDoc, ...documents]);
+  };
+
+  const handleRenameDoc = (id: string, currentName: string) => {
+    const newName = prompt('تغيير موضوع الكتاب:', currentName);
+    if (newName && newName.trim()) {
+      setDocuments(prev => prev.map(d => d.id === id ? { ...d, subject: newName } : d));
+    }
+  };
+
+  const handleRenameFolder = (id: string, currentName: string) => {
+    const newName = prompt('تغيير اسم الإضبارة:', currentName);
+    if (newName && newName.trim()) {
+      setFolders(prev => prev.map(f => f.id === id ? { ...f, name: newName } : f));
+    }
+  };
+
+  const handleRenameProject = (id: string, currentName: string) => {
+    const newName = prompt('تغيير اسم المشروع:', currentName);
+    if (newName && newName.trim()) {
+      setProjects(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p));
+    }
   };
 
   const processDelete = () => {
@@ -66,8 +92,15 @@ const App: React.FC = () => {
         setActiveView('list');
         setCurrentDocument(null);
       }
-    } else {
+    } else if (type === 'folder') {
       setFolders(prev => prev.map(f => f.id === id ? { ...f, deletedAt: new Date().toISOString() } : f));
+    } else if (type === 'project') {
+      setProjects(prev => prev.filter(p => p.id !== id));
+      setDocuments(prev => prev.map(d => d.projectId === id ? { ...d, deletedAt: new Date().toISOString() } : d));
+      if (currentProject?.id === id) {
+        setActiveProjectView('list');
+        setCurrentProject(null);
+      }
     }
     setConfirmDelete({ isOpen: false, id: '', type: 'doc' });
   };
@@ -75,22 +108,27 @@ const App: React.FC = () => {
   const processRestore = () => {
     const { item, type } = confirmRestore;
     if (type === 'doc') {
-      const parentFolder = folders.find(f => f.id === item.folderId);
-      let targetFolderId = item.folderId;
-      if (!parentFolder || parentFolder.deletedAt) {
-        let restoredSystemFolder = folders.find(f => f.name === 'إضبارة محذوفة' && !f.deletedAt);
-        if (!restoredSystemFolder) {
-          const newFolder: Folder = { id: 'folder-restored-' + Date.now(), name: 'إضبارة محذوفة', createdAt: new Date().toISOString(), color: 'bg-slate-700' };
-          setFolders(prev => [newFolder, ...prev]);
-          targetFolderId = newFolder.id;
-        } else targetFolderId = restoredSystemFolder.id;
-      }
-      setDocuments(prev => prev.map(d => d.id === item.id ? { ...d, deletedAt: null, folderId: targetFolderId } : d));
+      setDocuments(prev => prev.map(d => d.id === item.id ? { ...d, deletedAt: null } : d));
     } else {
       setFolders(prev => prev.map(f => f.id === item.id ? { ...f, deletedAt: null } : f));
     }
     setConfirmRestore({ isOpen: false, item: null, type: 'doc' });
   };
+
+  // Breadcrumbs Logic
+  const breadcrumbs = useMemo(() => {
+    const crumbs = [];
+    if (currentProject) {
+      crumbs.push({ 
+        label: currentProject.name, 
+        onClick: () => { setActiveProjectView('details'); setActiveTab('projects'); } 
+      });
+    }
+    if (currentDocument) {
+      crumbs.push({ label: currentDocument.subject });
+    }
+    return crumbs;
+  }, [currentProject, currentDocument]);
 
   const renderContent = () => {
     const activeDocs = documents.filter(d => !d.deletedAt);
@@ -105,7 +143,11 @@ const App: React.FC = () => {
           autoOpenFiles={autoOpenFiles}
           onBack={() => { setActiveView('list'); setCurrentDocument(null); }} 
           onDelete={() => setConfirmDelete({ isOpen: true, id: currentDocument.id, type: 'doc' })}
-          onAddAttachment={handleAddAttachmentToDoc}
+          onAddAttachment={(at) => {
+            const updated = documents.map(d => d.id === currentDocument.id ? {...d, attachments: [...d.attachments, at]} : d);
+            setDocuments(updated);
+            setCurrentDocument(updated.find(d => d.id === currentDocument.id) || null);
+          }}
         />
       );
     }
@@ -120,6 +162,10 @@ const App: React.FC = () => {
           onOpenUnit={handleOpenUnit}
           onDeleteDoc={(id) => setConfirmDelete({ isOpen: true, id, type: 'doc' })}
           onDeleteFolder={(id) => setConfirmDelete({ isOpen: true, id, type: 'folder' })}
+          onRenameDoc={handleRenameDoc}
+          onRenameFolder={handleRenameFolder}
+          onDuplicateDoc={handleDuplicateDoc}
+          onTogglePin={handleTogglePin}
         />
       );
     }
@@ -155,40 +201,40 @@ const App: React.FC = () => {
             documents={activeDocs}
             onSelectProject={(p) => { setCurrentProject(p); setActiveProjectView('details'); }}
             onAddProject={() => setIsAddProjectModalOpen(true)}
+            onDeleteProject={(id) => setConfirmDelete({ isOpen: true, id, type: 'project' })}
+            onRenameProject={handleRenameProject}
           />
         );
       default: return <Dashboard documents={activeDocs} />;
     }
   };
 
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-    setActiveView('list');
-    setActiveProjectView('list');
-    setCurrentDocument(null);
-    setCurrentProject(null);
-  };
-
   return (
-    <Layout activeTab={activeTab} setActiveTab={handleTabChange} onAddClick={() => setIsAddModalOpen(true)}>
+    <Layout 
+      activeTab={activeTab} 
+      setActiveTab={(t) => { setActiveTab(t); setCurrentProject(null); setCurrentDocument(null); setActiveView('list'); setActiveProjectView('list'); }} 
+      onAddClick={() => setIsAddModalOpen(true)}
+      breadcrumbs={breadcrumbs}
+    >
       {renderContent()}
       <AddDocumentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddDocument} folders={folders.filter(f => !f.deletedAt)} />
       <CreateProjectModal isOpen={isAddProjectModalOpen} onClose={() => setIsAddProjectModalOpen(false)} onSave={handleAddProject} />
       
       <ConfirmModal 
         isOpen={confirmDelete.isOpen} 
-        title="تأكيد النقل لسلة المهملات"
-        message="هل أنت متأكد من رغبتك في حذف هذا العنصر؟ سيتم حفظه في سلة المهملات لمدة 60 يوماً قبل حذفه نهائياً."
-        confirmLabel="نعم، احذف"
+        title={confirmDelete.type === 'project' ? "تأكيد حذف المشروع" : confirmDelete.type === 'folder' ? "تأكيد حذف الإضبارة" : "تأكيد الحذف"}
+        message={confirmDelete.type === 'project' ? "تحذير: سيتم حذف المشروع وكافة الكتب المرتبطة به. هذا الإجراء خطير جداً." : "هل أنت متأكد من رغبتك في حذف هذا العنصر؟"}
+        confirmLabel="نعم، حذف نهائي"
         cancelLabel="تراجع"
+        requireTextConfirmation={confirmDelete.type === 'project' || confirmDelete.type === 'folder'}
         onConfirm={processDelete}
         onCancel={() => setConfirmDelete({ isOpen: false, id: '', type: 'doc' })}
         type="danger"
       />
       <ConfirmModal 
         isOpen={confirmRestore.isOpen} 
-        title="تأكيد استرجاع العنصر"
-        message="سيتم استرجاع هذا العنصر إلى موقعه الأصلي في الأرشيف العام."
+        title="استرجاع العنصر"
+        message="سيتم استرجاع العنصر إلى مكانه الأصلي في الأرشيف."
         confirmLabel="استرجاع الآن"
         cancelLabel="إلغاء"
         onConfirm={processRestore}

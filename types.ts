@@ -28,6 +28,11 @@ export interface User {
   email: string;
   avatar: string;
   role: 'admin' | 'employee';
+  department?: string;
+  status?: 'active' | 'offline' | 'pending';
+  permissions?: string[];
+  joinedDate?: string;
+  lastActive?: string;
 }
 
 export interface Folder {
@@ -37,7 +42,7 @@ export interface Folder {
   createdAt: string;
   color?: string;
   deletedAt?: string | null;
-  projectId?: string; // الربط مع المشروع
+  projectId?: string;
 }
 
 export interface Document {
@@ -57,6 +62,7 @@ export interface Document {
   attachments: Attachment[];
   deletedAt?: string | null;
   isSleeve?: boolean;
+  isPinned?: boolean;
 }
 
 export interface Project {

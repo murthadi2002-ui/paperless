@@ -8,18 +8,25 @@ import {
   Bell, 
   Settings, 
   PlusCircle,
-  LogOut
+  LogOut,
+  ChevronLeft
 } from 'lucide-react';
 import { CURRENT_USER } from '../constants';
+
+interface Breadcrumb {
+  label: string;
+  onClick?: () => void;
+}
 
 interface LayoutProps {
   children: React.ReactNode;
   activeTab: string;
   setActiveTab: (tab: string) => void;
   onAddClick?: () => void;
+  breadcrumbs?: Breadcrumb[];
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAddClick }) => {
+const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAddClick, breadcrumbs = [] }) => {
   const menuItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
     { id: 'documents', label: 'الأرشيف العام', icon: FileText },
@@ -78,9 +85,29 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAd
         {/* Header */}
         <header className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 text-sm">النظام</span>
-            <span className="text-slate-300">/</span>
-            <span className="text-slate-800 font-semibold">{menuItems.find(m => m.id === activeTab)?.label}</span>
+            <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">النظام</span>
+            <ChevronLeft size={14} className="text-slate-300" />
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setActiveTab(activeTab)}
+                className="text-slate-800 font-bold text-sm hover:text-emerald-600 transition-colors"
+              >
+                {menuItems.find(m => m.id === activeTab)?.label}
+              </button>
+              {breadcrumbs.map((crumb, idx) => (
+                <React.Fragment key={idx}>
+                  <ChevronLeft size={14} className="text-slate-300" />
+                  <button 
+                    onClick={crumb.onClick}
+                    className={`text-sm font-bold truncate max-w-[150px] transition-colors ${
+                      idx === breadcrumbs.length - 1 ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    {crumb.label}
+                  </button>
+                </React.Fragment>
+              ))}
+            </div>
           </div>
           <div className="flex items-center gap-6">
             <button className="relative text-slate-500 hover:text-slate-800">
