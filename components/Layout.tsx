@@ -9,7 +9,8 @@ import {
   Settings, 
   PlusCircle,
   LogOut,
-  ChevronLeft
+  ChevronLeft,
+  MessageSquare
 } from 'lucide-react';
 import { CURRENT_USER } from '../constants';
 
@@ -31,6 +32,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAd
     { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
     { id: 'documents', label: 'الأرشيف العام', icon: FileText },
     { id: 'projects', label: 'المشاريع', icon: Briefcase },
+    { id: 'messages', label: 'المراسلات', icon: MessageSquare },
     { id: 'invites', label: 'إدارة الموظفين', icon: Users },
     { id: 'settings', label: 'الإعدادات والنظام', icon: Settings },
   ];
@@ -38,7 +40,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAd
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-cairo">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-l border-slate-200 flex flex-col transition-all duration-300">
+      <aside className="w-64 bg-white border-l border-slate-200 flex flex-col transition-all duration-300 z-40">
         <div className="p-6 flex items-center gap-3">
           <div className="bg-emerald-600 text-white p-2 rounded-lg">
             <PlusCircle size={24} />
@@ -81,9 +83,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAd
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden relative">
         {/* Header */}
-        <header className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between">
+        <header className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between z-30 shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">النظام</span>
             <ChevronLeft size={14} className="text-slate-300" />
@@ -125,7 +127,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAd
         </header>
 
         {/* Page Container */}
-        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar relative z-10">
           {children}
         </div>
       </main>

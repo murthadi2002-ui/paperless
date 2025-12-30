@@ -35,6 +35,12 @@ export interface User {
   lastActive?: string;
 }
 
+export interface Department {
+  id: string;
+  name: string;
+  employeeCount: number;
+}
+
 export interface Folder {
   id: string;
   name: string;
@@ -71,4 +77,16 @@ export interface Project {
   code: string;
   description: string;
   createdAt?: string;
+}
+
+export interface Message {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  text?: string;
+  timestamp: string;
+  attachment?: Attachment;
+  archivedDocId?: string; // Reference to a document in the archive
+  isVoice?: boolean;
+  isRead?: boolean;
 }

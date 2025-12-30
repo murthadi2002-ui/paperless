@@ -10,9 +10,10 @@ import SettingsPage from './components/SettingsPage';
 import ProjectList from './components/ProjectList';
 import ProjectDetailsView from './components/ProjectDetailsView';
 import CreateProjectModal from './components/CreateProjectModal';
+import MessagingPage from './components/MessagingPage';
 import ConfirmModal from './components/ConfirmModal';
-import { MOCK_DOCUMENTS, MOCK_FOLDERS, MOCK_PROJECTS } from './constants';
-import { Document, Folder, Attachment, Project } from './types';
+import { MOCK_DOCUMENTS, MOCK_FOLDERS, MOCK_PROJECTS, MOCK_DEPARTMENTS, MOCK_EMPLOYEES, CURRENT_USER } from './constants';
+import { Document, Folder, Attachment, Project, Department, User } from './types';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -28,13 +29,15 @@ const App: React.FC = () => {
   const [documents, setDocuments] = useState<Document[]>(MOCK_DOCUMENTS);
   const [folders, setFolders] = useState<Folder[]>(MOCK_FOLDERS);
   const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS);
+  const [departments, setDepartments] = useState<Department[]>(MOCK_DEPARTMENTS);
+  const [employees, setEmployees] = useState<User[]>(MOCK_EMPLOYEES);
   
   // Selection Context
   const [currentDocument, setCurrentDocument] = useState<Document | null>(null);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
 
   // Confirmation Modals State
-  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string; type: 'doc' | 'folder' | 'project' }>({ isOpen: false, id: '', type: 'doc' });
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string; type: 'doc' | 'folder' | 'project' | 'department' }>({ isOpen: false, id: '', type: 'doc' });
   const [confirmRestore, setConfirmRestore] = useState<{ isOpen: boolean; item: any; type: 'doc' | 'folder' }>({ isOpen: false, item: null, type: 'doc' });
 
   // Actions
@@ -101,6 +104,12 @@ const App: React.FC = () => {
         setActiveProjectView('list');
         setCurrentProject(null);
       }
+    } else if (type === 'department') {
+      if (CURRENT_USER.role !== 'admin') {
+        alert('ليس لديك صلاحية لحذف الأقسام');
+        return;
+      }
+      setDepartments(prev => prev.filter(d => d.id !== id));
     }
     setConfirmDelete({ isOpen: false, id: '', type: 'doc' });
   };
@@ -113,6 +122,16 @@ const App: React.FC = () => {
       setFolders(prev => prev.map(f => f.id === item.id ? { ...f, deletedAt: null } : f));
     }
     setConfirmRestore({ isOpen: false, item: null, type: 'doc' });
+  };
+
+  const handleArchiveReceivedFile = (file: any) => {
+    // Open the add document modal with the file pre-attached
+    // For now, just a simplified simulation:
+    const confirmArchiving = confirm(`هل تريد أرشفة الملف "${file.name}"؟`);
+    if (confirmArchiving) {
+      setIsAddModalOpen(true);
+      // In a real implementation, we would pass the file to the modal's state
+    }
   };
 
   // Breadcrumbs Logic
@@ -172,6 +191,13 @@ const App: React.FC = () => {
 
     switch (activeTab) {
       case 'dashboard': return <Dashboard documents={activeDocs} />;
+      case 'messages': return (
+        <MessagingPage 
+          documents={activeDocs} 
+          folders={activeFolders} 
+          onArchiveFile={handleArchiveReceivedFile}
+        />
+      );
       case 'settings': return (
         <SettingsPage 
           deletedDocs={deletedDocs} 
@@ -180,9 +206,18 @@ const App: React.FC = () => {
           setAutoOpenFiles={setAutoOpenFiles}
           onRestoreDoc={(doc) => setConfirmRestore({ isOpen: true, item: doc, type: 'doc' })} 
           onRestoreFolder={(f) => setConfirmRestore({ isOpen: true, item: f, type: 'folder' })} 
+          departments={departments}
+          setDepartments={setDepartments}
+          onDeleteDepartment={(id) => setConfirmDelete({ isOpen: true, id, type: 'department' })}
         />
       );
-      case 'invites': return <InviteManagement />;
+      case 'invites': return (
+        <InviteManagement 
+          departments={departments} 
+          employees={employees} 
+          setEmployees={setEmployees}
+        />
+      );
       case 'projects':
         if (activeProjectView === 'details' && currentProject) {
           return (
@@ -222,11 +257,19 @@ const App: React.FC = () => {
       
       <ConfirmModal 
         isOpen={confirmDelete.isOpen} 
-        title={confirmDelete.type === 'project' ? "تأكيد حذف المشروع" : confirmDelete.type === 'folder' ? "تأكيد حذف الإضبارة" : "تأكيد الحذف"}
-        message={confirmDelete.type === 'project' ? "تحذير: سيتم حذف المشروع وكافة الكتب المرتبطة به. هذا الإجراء خطير جداً." : "هل أنت متأكد من رغبتك في حذف هذا العنصر؟"}
+        title={
+          confirmDelete.type === 'project' ? "تأكيد حذف المشروع" : 
+          confirmDelete.type === 'folder' ? "تأكيد حذف الإضبارة" : 
+          confirmDelete.type === 'department' ? "تأكيد حذف القسم" : "تأكيد الحذف"
+        }
+        message={
+          confirmDelete.type === 'project' ? "تحذير: سيتم حذف المشروع وكافة الكتب المرتبطة به. هذا الإجراء خطير جداً." : 
+          confirmDelete.type === 'department' ? "تحذير: سيتم حذف هذا القسم نهائياً. يرجى التأكد من نقل الموظفين التابعين له أولاً." :
+          "هل أنت متأكد من رغبتك في حذف هذا العنصر؟"
+        }
         confirmLabel="نعم، حذف نهائي"
         cancelLabel="تراجع"
-        requireTextConfirmation={confirmDelete.type === 'project' || confirmDelete.type === 'folder'}
+        requireTextConfirmation={confirmDelete.type === 'project' || confirmDelete.type === 'folder' || confirmDelete.type === 'department'}
         onConfirm={processDelete}
         onCancel={() => setConfirmDelete({ isOpen: false, id: '', type: 'doc' })}
         type="danger"

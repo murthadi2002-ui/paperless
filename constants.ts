@@ -1,9 +1,18 @@
 
-import { DocType, DocStatus, Document, Project, User, Folder } from './types';
+import { DocType, DocStatus, Document, Project, User, Folder, Department, Message } from './types';
 
 export const MOCK_PROJECTS: Project[] = [
   { id: 'p1', name: 'مشروع برج دبي', code: 'PRJ-DB-001', description: 'تطوير البنية التحتية لبرج دبي', createdAt: '2023-11-01' },
   { id: 'p2', name: 'مجمع سكني - الرياض', code: 'PRJ-RY-005', description: 'إنشاء 500 وحدة سكنية', createdAt: '2023-12-15' }
+];
+
+export const MOCK_DEPARTMENTS: Department[] = [
+  { id: 'd1', name: 'الإدارة العامة', employeeCount: 1 },
+  { id: 'd2', name: 'الهندسة المعمارية', employeeCount: 1 },
+  { id: 'd3', name: 'الإدارة القانونية', employeeCount: 1 },
+  { id: 'd4', name: 'الموارد البشرية', employeeCount: 1 },
+  { id: 'd5', name: 'المحاسبة', employeeCount: 0 },
+  { id: 'd6', name: 'إدارة المشاريع', employeeCount: 1 }
 ];
 
 export const MOCK_FOLDERS: Folder[] = [
@@ -96,7 +105,7 @@ export const MOCK_EMPLOYEES: User[] = [
     email: 'yasin.f@paperless.com',
     avatar: 'https://i.pravatar.cc/150?u=yasin',
     role: 'employee',
-    department: 'القسم الهندسي',
+    department: 'الإدارة العامة',
     status: 'pending',
     joinedDate: '2024-03-01',
     lastActive: 'لم يسجل دخول بعد',
@@ -124,3 +133,9 @@ export const CURRENT_USER: User = {
   role: 'admin',
   department: 'الإدارة العامة'
 };
+
+export const MOCK_MESSAGES: Message[] = [
+  { id: 'm1', senderId: 'u2', receiverId: 'u1', text: 'أهلاً أحمد، هل اطلعت على مخططات برج دبي الأخيرة؟', timestamp: '10:30 ص', isRead: true },
+  { id: 'm2', senderId: 'u1', receiverId: 'u2', text: 'نعم سارة، بانتظار موافقة الإدارة القانونية.', timestamp: '10:35 ص', isRead: true },
+  { id: 'm3', senderId: 'u3', receiverId: 'u1', text: 'تمت مراجعة العقود، سأرسلها لك الآن من الأرشيف.', timestamp: '11:00 ص', isRead: false },
+];
