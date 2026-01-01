@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Search, Plus, Briefcase, FileText, ChevronLeft, MoreVertical, LayoutGrid, List, Trash2, Edit3 } from 'lucide-react';
 import { Project, Document } from '../types';
+import { CURRENT_USER } from '../constants';
 
 interface ProjectListProps {
   projects: Project[];
@@ -9,12 +10,15 @@ interface ProjectListProps {
   onSelectProject: (project: Project) => void;
   onAddProject: () => void;
   onDeleteProject?: (id: string) => void;
-  onRenameProject?: (id: string, name: string) => void;
+  onRenameProject?: (id: string, oldName: string) => void;
 }
 
 const ProjectList: React.FC<ProjectListProps> = ({ projects, documents, onSelectProject, onAddProject, onDeleteProject, onRenameProject }) => {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+
+  const canEdit = CURRENT_USER.role === 'admin' || CURRENT_USER.permissions?.includes('تعديل مشروع') || CURRENT_USER.permissions?.includes('إدارة المشاريع');
+  const canDelete = CURRENT_USER.role === 'admin' || CURRENT_USER.permissions?.includes('حذف مشروع') || CURRENT_USER.permissions?.includes('إدارة المشاريع');
 
   const filteredProjects = projects.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -30,7 +34,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, documents, onSelect
     <div className="space-y-8 animate-in fade-in duration-500" onClick={() => setActiveMenu(null)}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">إدارة المشاريع</h2>
+          <h2 className="text-2xl font-bold text-slate-800">إدارة المشاريع الهندسية</h2>
           <p className="text-slate-500 mt-1">تتبع الأرشفة والمراسلات لكل مشروع هندسي على حدة</p>
         </div>
         <div className="flex items-center gap-3">
@@ -80,20 +84,24 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, documents, onSelect
                       <MoreVertical size={20} />
                     </button>
                     {activeMenu === project.id && (
-                      <div className="absolute left-0 top-full mt-2 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl z-20 py-2 animate-in fade-in zoom-in-95 origin-top-left">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); onRenameProject?.(project.id, project.name); setActiveMenu(null); }}
-                          className="w-full text-right px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
-                        >
-                          <Edit3 size={14} /> إعادة تسمية المشروع
-                        </button>
+                      <div className="absolute left-0 top-full mt-2 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl z-20 py-2 animate-in fade-in zoom-in-95 origin-top-left overflow-hidden">
+                        {canEdit && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); onRenameProject?.(project.id, project.name); setActiveMenu(null); }}
+                            className="w-full text-right px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                          >
+                            <Edit3 size={14} /> إعادة تسمية المشروع
+                          </button>
+                        )}
                         <hr className="my-1 border-slate-50" />
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); onDeleteProject?.(project.id); setActiveMenu(null); }}
-                          className="w-full text-right px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors"
-                        >
-                          <Trash2 size={14} /> حذف المشروع بكامله
-                        </button>
+                        {canDelete && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); onDeleteProject?.(project.id); setActiveMenu(null); }}
+                            className="w-full text-right px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors"
+                          >
+                            <Trash2 size={14} /> حذف المشروع نهائياً
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

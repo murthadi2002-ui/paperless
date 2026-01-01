@@ -35,7 +35,7 @@ const App: React.FC = () => {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
 
   // Deletion State
-  const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'doc' | 'folder' } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'doc' | 'folder' | 'attachment' | 'project', parentId?: string } | null>(null);
 
   const handleAddDocument = (newDoc: Document) => setDocuments([{...newDoc, tasks: []}, ...documents]);
 
@@ -57,10 +57,39 @@ const App: React.FC = () => {
     if (!confirmDelete) return;
     if (confirmDelete.type === 'doc') {
       setDocuments(prev => prev.map(d => d.id === confirmDelete.id ? { ...d, deletedAt: new Date().toISOString() } : d));
-    } else {
+      setActiveView('list');
+    } else if (confirmDelete.type === 'folder') {
       setFolders(prev => prev.map(f => f.id === confirmDelete.id ? { ...f, deletedAt: new Date().toISOString() } : f));
+    } else if (confirmDelete.type === 'attachment' && confirmDelete.parentId) {
+      // حذف مرفق من كتاب محدد
+      const updatedDocs = documents.map(d => 
+        d.id === confirmDelete.parentId 
+        ? { ...d, attachments: d.attachments.filter(at => at.id !== confirmDelete.id) } 
+        : d
+      );
+      setDocuments(updatedDocs);
+      if (currentDocument?.id === confirmDelete.parentId) {
+        setCurrentDocument(prev => prev ? { ...prev, attachments: prev.attachments.filter(at => at.id !== confirmDelete.id) } : null);
+      }
+    } else if (confirmDelete.type === 'project') {
+      setProjects(prev => prev.filter(p => p.id !== confirmDelete.id));
+      setActiveProjectView('list');
     }
     setConfirmDelete(null);
+  };
+
+  const handleUpdateDocSubject = (id: string, newSubject: string) => {
+    setDocuments(prev => prev.map(d => d.id === id ? { ...d, subject: newSubject } : d));
+    if (currentDocument?.id === id) {
+      setCurrentDocument(prev => prev ? { ...prev, subject: newSubject } : null);
+    }
+  };
+
+  const handleAddAttachmentToDoc = (docId: string, attachment: Attachment) => {
+    setDocuments(prev => prev.map(d => d.id === docId ? { ...d, attachments: [...d.attachments, attachment] } : d));
+    if (currentDocument?.id === docId) {
+      setCurrentDocument(prev => prev ? { ...prev, attachments: [...prev.attachments, attachment] } : null);
+    }
   };
 
   const handleDuplicateDoc = (doc: Document) => {
@@ -76,20 +105,6 @@ const App: React.FC = () => {
     setDocuments([newDoc, ...documents]);
   };
 
-  const handleRenameDoc = (id: string) => {
-    const newName = prompt('أدخل الاسم الجديد للكتاب:');
-    if (newName && newName.trim()) {
-      setDocuments(prev => prev.map(d => d.id === id ? { ...d, subject: newName } : d));
-    }
-  };
-
-  const handleRenameFolder = (id: string) => {
-    const newName = prompt('أدخل الاسم الجديد للأضبارة:');
-    if (newName && newName.trim()) {
-      setFolders(prev => prev.map(f => f.id === id ? { ...f, name: newName } : f));
-    }
-  };
-
   const renderContent = () => {
     const activeDocs = documents.filter(d => !d.deletedAt);
     const activeFolders = folders.filter(f => !f.deletedAt);
@@ -103,11 +118,9 @@ const App: React.FC = () => {
           autoOpenFiles={autoOpenFiles}
           onBack={() => { setActiveView('list'); setCurrentDocument(null); }} 
           onDelete={() => setConfirmDelete({ id: currentDocument.id, type: 'doc' })}
-          onAddAttachment={(at) => {
-            const updated = documents.map(d => d.id === currentDocument.id ? {...d, attachments: [...d.attachments, at]} : d);
-            setDocuments(updated);
-            setCurrentDocument(updated.find(d => d.id === currentDocument.id) || null);
-          }}
+          onUpdateSubject={(newSub) => handleUpdateDocSubject(currentDocument.id, newSub)}
+          onAddAttachment={(at) => handleAddAttachmentToDoc(currentDocument.id, at)}
+          onDeleteAttachment={(atId) => setConfirmDelete({ id: atId, type: 'attachment', parentId: currentDocument.id })}
           onAddTask={handleAddTask}
         />
       );
@@ -125,8 +138,14 @@ const App: React.FC = () => {
             onOpenUnit={handleOpenUnit}
             onDeleteDoc={(id) => setConfirmDelete({ id, type: 'doc' })}
             onDeleteFolder={(id) => setConfirmDelete({ id, type: 'folder' })}
-            onRenameDoc={handleRenameDoc}
-            onRenameFolder={handleRenameFolder}
+            onRenameDoc={(id, oldName) => {
+              const newName = prompt('تعديل اسم الكتاب:', oldName);
+              if (newName) handleUpdateDocSubject(id, newName);
+            }}
+            onRenameFolder={(id, oldName) => {
+              const newName = prompt('تعديل اسم الإضبارة:', oldName);
+              if (newName) setFolders(prev => prev.map(f => f.id === id ? { ...f, name: newName } : f));
+            }}
             onDuplicateDoc={handleDuplicateDoc}
             onTogglePin={(id) => setDocuments(prev => prev.map(d => d.id === id ? { ...d, isPinned: !d.isPinned } : d))}
           />
@@ -135,7 +154,19 @@ const App: React.FC = () => {
       case 'messages': return <MessagingPage documents={activeDocs} folders={activeFolders} onArchiveFile={()=>{}} />;
       case 'projects':
         if (activeProjectView === 'details' && currentProject) return <ProjectDetailsView project={currentProject} documents={activeDocs} folders={activeFolders} onBack={()=>{setActiveProjectView('list');setCurrentProject(null)}} onOpenDoc={handleOpenUnit} />;
-        return <ProjectList projects={projects} documents={activeDocs} onSelectProject={(p)=>{setCurrentProject(p);setActiveProjectView('details')}} onAddProject={()=>setIsAddProjectModalOpen(true)} />;
+        return (
+          <ProjectList 
+            projects={projects} 
+            documents={activeDocs} 
+            onSelectProject={(p)=>{setCurrentProject(p);setActiveProjectView('details')}} 
+            onAddProject={()=>setIsAddProjectModalOpen(true)}
+            onDeleteProject={(id) => setConfirmDelete({ id, type: 'project' })}
+            onRenameProject={(id, oldName) => {
+              const newName = prompt('تعديل اسم المشروع:', oldName);
+              if (newName) setProjects(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p));
+            }}
+          />
+        );
       case 'invites': return <InviteManagement departments={departments} employees={employees} setEmployees={setEmployees} />;
       case 'settings': return <SettingsPage deletedDocs={deletedDocs} deletedFolders={deletedFolders} autoOpenFiles={autoOpenFiles} setAutoOpenFiles={setAutoOpenFiles} onRestoreDoc={(doc)=>setDocuments(documents.map(d=>d.id===doc.id?{...d,deletedAt:null}:d))} onRestoreFolder={(f)=>setFolders(folders.map(fo=>fo.id===f.id?{...fo,deletedAt:null}:fo))} departments={departments} setDepartments={setDepartments} onDeleteDepartment={(id)=>setDepartments(departments.filter(d=>d.id!==id))} />;
       default: return <Dashboard documents={activeDocs} onOpenDoc={handleOpenUnit} />;
@@ -159,13 +190,23 @@ const App: React.FC = () => {
 
       <ConfirmModal 
         isOpen={!!confirmDelete} 
-        title={confirmDelete?.type === 'doc' ? 'حذف الوثيقة' : 'حذف الأضبارة'}
-        message={confirmDelete?.type === 'doc' ? 'هل أنت متأكد من نقل هذا الكتاب إلى سلة المهملات؟' : 'سيتم نقل الأضبارة وجميع ارتباطاتها لسلة المهملات.'}
+        title={
+          confirmDelete?.type === 'doc' ? 'حذف الوثيقة' : 
+          confirmDelete?.type === 'folder' ? 'حذف الأضبارة' : 
+          confirmDelete?.type === 'attachment' ? 'حذف المرفق' : 
+          'حذف المشروع'
+        }
+        message={
+          confirmDelete?.type === 'doc' ? 'هل أنت متأكد من نقل هذا الكتاب إلى سلة المهملات؟' : 
+          confirmDelete?.type === 'folder' ? 'سيتم نقل الأضبارة وجميع ارتباطاتها لسلة المهملات.' : 
+          confirmDelete?.type === 'attachment' ? 'هل أنت متأكد من حذف هذا الملف المرفق نهائياً من سجل الكتاب؟' : 
+          'هل أنت متأكد من حذف هذا المشروع نهائياً؟ سيؤدي ذلك لفك ارتباط كافة الوثائق به.'
+        }
         confirmLabel="نعم، حذف"
         cancelLabel="إلغاء"
         onConfirm={executeDelete}
         onCancel={() => setConfirmDelete(null)}
-        requireTextConfirmation={true}
+        requireTextConfirmation={confirmDelete?.type !== 'attachment'}
       />
     </Layout>
   );
