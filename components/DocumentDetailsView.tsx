@@ -119,47 +119,50 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
     <div className="space-y-6 animate-in fade-in duration-500 text-right" dir="rtl" onClick={() => setIsMenuOpen(false)}>
       <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
       
-      {/* Header */}
-      <div className="flex flex-col md:flex-row items-center justify-between bg-white p-5 px-8 rounded-[2rem] border border-slate-200 shadow-sm gap-4">
-        <div className="flex items-center gap-4 flex-1">
-          <button onClick={onBack} className="p-2.5 hover:bg-slate-50 rounded-2xl text-slate-400 transition-all flex items-center gap-2 font-black text-xs shrink-0">
-             <ChevronRight size={20} /> الأرشيف العام
+      {/* Header - Refined & Fixed Responsive Issues */}
+      <div className="flex flex-col lg:flex-row items-center justify-between bg-white p-4 px-6 rounded-[2rem] border border-slate-200 shadow-sm gap-4 overflow-hidden">
+        <div className="flex items-center gap-4 flex-1 min-w-0 w-full">
+          <button onClick={onBack} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-all flex items-center gap-2 font-black text-[11px] shrink-0">
+             <ChevronRight size={18} /> الأرشيف
           </button>
-          <div className="h-10 w-[1px] bg-slate-100 hidden md:block"></div>
-          <div className="flex items-center gap-4 flex-1 group">
-             <div className="p-3 rounded-2xl bg-emerald-600 text-white shadow-lg shrink-0"><FileText size={22} /></div>
+          <div className="h-8 w-[1px] bg-slate-100 hidden lg:block shrink-0"></div>
+          <div className="flex items-center gap-3 flex-1 group min-w-0">
+             <div className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-lg shrink-0"><FileText size={18} /></div>
              {isEditingSubject ? (
-               <div className="flex items-center gap-2 flex-1 animate-in slide-in-from-right-2">
+               <div className="flex items-center gap-2 flex-1 animate-in slide-in-from-right-2 min-w-0">
                  <input 
                    autoFocus
                    type="text" 
                    value={editSubject} 
                    onChange={(e) => setEditSubject(e.target.value)}
                    onKeyDown={(e) => e.key === 'Enter' && handleSubjectSave()}
-                   className="flex-1 bg-slate-50 border border-emerald-500 rounded-xl px-4 py-2 font-black text-slate-800 outline-none text-base"
+                   className="flex-1 bg-slate-50 border border-emerald-500 rounded-xl px-3 py-1.5 font-black text-slate-800 outline-none text-sm min-w-0"
                  />
-                 <button onClick={handleSubjectSave} className="p-2 bg-emerald-600 text-white rounded-xl shadow-md"><Check size={18} /></button>
-                 <button onClick={() => setIsEditingSubject(false)} className="p-2 bg-slate-100 text-slate-400 rounded-xl"><X size={18} /></button>
+                 <button onClick={handleSubjectSave} className="p-1.5 bg-emerald-600 text-white rounded-lg shadow-md shrink-0"><Check size={16} /></button>
+                 <button onClick={() => setIsEditingSubject(false)} className="p-1.5 bg-slate-100 text-slate-400 rounded-lg shrink-0"><X size={16} /></button>
                </div>
              ) : (
-               <div className="flex items-center gap-2 overflow-hidden">
-                 <h2 className="text-xl font-black text-slate-800 truncate leading-snug">{doc.subject}</h2>
-                 {canEdit && <button onClick={() => setIsEditingSubject(true)} className="p-1.5 text-slate-200 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16} /></button>}
+               <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+                 <h2 className="text-base font-black text-slate-800 truncate leading-snug tracking-tight" title={doc.subject}>
+                    {doc.subject}
+                 </h2>
+                 {canEdit && <button onClick={() => setIsEditingSubject(true)} className="p-1.5 text-slate-200 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg lg:opacity-0 group-hover:opacity-100 transition-all shrink-0"><Edit3 size={14} /></button>}
                </div>
              )}
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        
+        <div className="flex items-center gap-2 shrink-0 w-full lg:w-auto justify-center lg:justify-end">
           <button 
             onClick={() => simulateDownload('all')} 
-            className="flex items-center gap-2 px-5 py-3 bg-slate-100 text-slate-600 rounded-[1.2rem] text-xs font-black hover:bg-white hover:shadow-xl transition-all border border-slate-200"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black hover:bg-white hover:shadow-xl transition-all border border-slate-200 shrink-0"
           >
-            <DownloadIconWithProgress size={18} isDownloading={downloadingId === 'all'} progress={downloadProgress} /> 
+            <DownloadIconWithProgress size={16} isDownloading={downloadingId === 'all'} progress={downloadProgress} /> 
             تنزيل الكل
           </button>
-          <button onClick={() => setShowTaskForm(true)} className="flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-[1.2rem] text-xs font-black shadow-lg shadow-amber-100 hover:bg-amber-700 transition-all active:scale-95"><SendHorizontal size={18} /> توجيه إداري</button>
-          <div className="relative">
-            <button onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }} className="p-3 text-slate-300 hover:text-slate-600 rounded-2xl hover:bg-slate-50 transition-all"><MoreVertical size={24} /></button>
+          <button onClick={() => setShowTaskForm(true)} className="flex items-center gap-2 px-5 py-2 bg-amber-600 text-white rounded-xl text-[10px] font-black shadow-lg shadow-amber-100 hover:bg-amber-700 transition-all active:scale-95 shrink-0"><SendHorizontal size={16} /> توجيه إداري</button>
+          <div className="relative shrink-0">
+            <button onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }} className="p-2.5 text-slate-300 hover:text-slate-600 rounded-xl hover:bg-slate-50 transition-all"><MoreVertical size={20} /></button>
             {isMenuOpen && (
               <div className="absolute left-0 top-full mt-2 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl z-50 py-2 animate-in fade-in zoom-in-95 origin-top-left overflow-hidden">
                 <button onClick={() => { setIsEditingSubject(true); setIsMenuOpen(false); }} className="w-full text-right px-4 py-3 text-xs font-black text-slate-600 hover:bg-slate-50 flex items-center justify-end gap-3 transition-colors"><Edit3 size={16} /> تعديل الاسم</button>
@@ -231,19 +234,19 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
         <div className="lg:col-span-8 space-y-6">
           <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm min-h-[600px] flex flex-col relative overflow-hidden">
             {/* Slimmer/Nazk Header */}
-            <div className="p-5 px-8 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-20">
-               <div>
-                 <h3 className="text-lg font-black text-slate-800">مرفقات الأرشفة الرسمية</h3>
-                 <p className="text-slate-400 text-[10px] font-bold mt-0.5">يمكنك معاينة، تحميل، أو إدارة الملفات الملحقة بالكتاب</p>
+            <div className="p-4 px-8 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-20">
+               <div className="overflow-hidden">
+                 <h3 className="text-base font-black text-slate-800 truncate">مرفقات الأرشفة الرسمية</h3>
+                 <p className="text-slate-400 text-[9px] font-bold mt-0.5 truncate">يمكنك معاينة، تحميل، أو إدارة الملفات الملحقة بالكتاب</p>
                </div>
                {canEdit && (
-                 <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2.5 px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-black text-[10px] shadow-lg shadow-emerald-50 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all active:scale-95 group">
-                   <PlusCircle size={16} className="group-hover:rotate-90 transition-transform duration-500" /> إرفاق ملف جديد
+                 <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-black text-[10px] shadow-lg shadow-emerald-50 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all active:scale-95 group shrink-0">
+                   <PlusCircle size={14} className="group-hover:rotate-90 transition-transform duration-500" /> إرفاق ملف
                  </button>
                )}
             </div>
             
-            <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 content-start bg-slate-50/30">
+            <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 content-start bg-slate-50/30">
                {doc.attachments.map((file) => (
                  <div key={file.id} onClick={() => simulateDownload(file.id)} className="group bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer flex flex-col relative overflow-hidden">
                     <div className="flex justify-between items-start mb-6">
@@ -265,7 +268,7 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
                        </div>
                     </div>
                     <div className="space-y-2">
-                       <h4 className="font-black text-slate-800 text-xs truncate leading-tight">{file.name}</h4>
+                       <h4 className="font-black text-slate-800 text-xs truncate leading-tight" title={file.name}>{file.name}</h4>
                        <div className="flex items-center justify-between pt-3 border-t border-slate-50">
                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{file.size}</span>
                           <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">معاينة آمنة</span>
