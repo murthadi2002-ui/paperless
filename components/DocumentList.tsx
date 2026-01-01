@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
-import { Search, FileDown, FileUp, Eye, MoreVertical, Paperclip, Folder as FolderIcon, FolderPlus, ChevronLeft, Trash2, Briefcase, Star, Copy, Edit3, Map } from 'lucide-react';
+import { Search, FileDown, FileUp, Eye, MoreVertical, Paperclip, Folder as FolderIcon, FolderPlus, ChevronLeft, Trash2, Briefcase, Star, Copy, Edit3, Map, Clock, Plus, LayoutGrid, Filter, ArrowRight } from 'lucide-react';
 import { DocType, DocStatus, Document, Folder, Project } from '../types';
+import { CURRENT_USER } from '../constants';
 import CreateFolderModal from './CreateFolderModal';
 
 interface DocumentListProps {
@@ -23,322 +24,148 @@ const DocumentList: React.FC<DocumentListProps> = ({
   onRenameDoc, onRenameFolder, onDuplicateDoc, onTogglePin
 }) => {
   const [viewMode, setViewMode] = useState<'types' | 'folders' | 'pinned'>('types');
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
-  const lastProject = useMemo(() => {
-    return [...projects].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))[0];
-  }, [projects]);
-
-  const [projectFilterId, setProjectFilterId] = useState<string | 'all' | 'none'>(lastProject?.id || 'all');
-
-  const filteredFolders = useMemo(() => {
-    return folders.filter(f => {
-      const matchesSearch = f.name.toLowerCase().includes(searchTerm.toLowerCase());
-      if (projectFilterId === 'all') return matchesSearch;
-      if (projectFilterId === 'none') return !f.projectId && matchesSearch;
-      return f.projectId === projectFilterId && matchesSearch;
-    });
-  }, [folders, projectFilterId, searchTerm]);
+  const canEdit = CURRENT_USER.role === 'admin' || CURRENT_USER.permissions?.includes('تعديل كتاب');
+  const canDelete = CURRENT_USER.role === 'admin' || CURRENT_USER.permissions?.includes('حذف كتاب');
 
   const filteredDocs = useMemo(() => {
     return documents.filter(doc => {
       const matchesSearch = doc.subject.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                           doc.refNumber.includes(searchTerm) || 
-                           doc.sender.toLowerCase().includes(searchTerm.toLowerCase());
+                           doc.refNumber.includes(searchTerm);
+      const matchesType = filterType === 'all' || doc.type === filterType;
+      const matchesProject = selectedProjectId === 'all' || doc.projectId === selectedProjectId;
+      const matchesFolder = activeFolderId ? doc.folderId === activeFolderId : true;
       
       if (viewMode === 'pinned') return doc.isPinned && matchesSearch;
-      
-      if (viewMode === 'folders' && selectedFolderId) {
-        return doc.folderId === selectedFolderId && matchesSearch;
-      }
-
-      const matchesType = filterType === 'all' || doc.type === filterType;
-      return matchesType && matchesSearch;
+      return matchesType && matchesSearch && matchesProject && matchesFolder;
     });
-  }, [documents, viewMode, selectedFolderId, filterType, searchTerm]);
+  }, [documents, viewMode, selectedProjectId, filterType, searchTerm, activeFolderId]);
 
-  const toggleMenu = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    setActiveMenu(activeMenu === id ? null : id);
-  };
+  const filteredFolders = useMemo(() => {
+    return folders.filter(f => {
+      const matchesSearch = f.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesProject = selectedProjectId === 'all' || f.projectId === selectedProjectId;
+      return matchesSearch && matchesProject;
+    });
+  }, [folders, selectedProjectId, searchTerm]);
+
+  const activeFolder = folders.find(f => f.id === activeFolderId);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500" onClick={() => setActiveMenu(null)}>
-      <CreateFolderModal 
-        isOpen={isCreateFolderOpen} 
-        onClose={() => setIsCreateFolderOpen(false)} 
-        onSave={onAddFolder} 
-      />
+    <div className="space-y-6 animate-in fade-in duration-500 text-right" dir="rtl" onClick={() => setActiveMenu(null)}>
+      <CreateFolderModal isOpen={isCreateFolderOpen} onClose={() => setIsCreateFolderOpen(false)} onSave={onAddFolder} />
 
-      <div className="flex items-center gap-4 border-b border-slate-200 pb-2">
-        <button 
-          onClick={() => { setViewMode('types'); setSelectedFolderId(null); }}
-          className={`pb-2 px-4 text-sm font-bold transition-all border-b-2 ${viewMode === 'types' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-        >
-          التصنيف النوعي
-        </button>
-        <button 
-          onClick={() => { setViewMode('folders'); setSelectedFolderId(null); }}
-          className={`pb-2 px-4 text-sm font-bold transition-all border-b-2 ${viewMode === 'folders' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-        >
-          الأضابير الموضوعية
-        </button>
-        <button 
-          onClick={() => { setViewMode('pinned'); setSelectedFolderId(null); }}
-          className={`pb-2 px-4 text-sm font-bold transition-all border-b-2 flex items-center gap-2 ${viewMode === 'pinned' ? 'border-amber-600 text-amber-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-        >
-          <Star size={16} fill={viewMode === 'pinned' ? 'currentColor' : 'none'} />
-          وثائق مركزية (هامة)
-        </button>
-      </div>
-
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-        {viewMode === 'types' ? (
-          <div className="flex gap-2 p-1 bg-white border border-slate-200 rounded-2xl shadow-sm">
-            {['all', DocType.INCOMING, DocType.OUTGOING, DocType.INTERNAL].map((type) => (
-              <button
-                key={type}
-                onClick={() => setFilterType(type)}
-                className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${
-                  filterType === type ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'
-                }`}
-              >
-                {type === 'all' ? 'الكل' : type}
-              </button>
-            ))}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex items-center gap-4 border-b border-slate-200 pb-2">
+          {activeFolderId ? (
+            <button onClick={() => setActiveFolderId(null)} className="pb-2 px-2 text-emerald-600 hover:bg-emerald-50 rounded-lg flex items-center gap-1 font-black text-xs transition-all">
+              <ArrowRight size={16} /> العودة للأضابير
+            </button>
+          ) : (
+            <>
+              <button onClick={() => { setViewMode('types'); setActiveFolderId(null); }} className={`pb-2 px-4 text-xs font-black transition-all border-b-2 ${viewMode === 'types' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>الكتب المؤرشفة</button>
+              <button onClick={() => { setViewMode('folders'); setActiveFolderId(null); }} className={`pb-2 px-4 text-xs font-black transition-all border-b-2 ${viewMode === 'folders' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>الأضابير الموضوعية</button>
+              <button onClick={() => { setViewMode('pinned'); setActiveFolderId(null); }} className={`pb-2 px-4 text-xs font-black transition-all border-b-2 flex items-center gap-2 ${viewMode === 'pinned' ? 'border-amber-600 text-amber-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}><Star size={14} fill={viewMode === 'pinned' ? 'currentColor' : 'none'} /> وثائق مركزية</button>
+            </>
+          )}
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="relative group">
+            <Filter className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+            <select 
+              className="pr-10 pl-8 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-black outline-none appearance-none cursor-pointer"
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+            >
+              <option value="all">كل المشاريع</option>
+              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
           </div>
-        ) : viewMode === 'folders' ? (
-          <div className="flex flex-wrap items-center gap-3">
-             {selectedFolderId ? (
-               <button 
-                onClick={() => setSelectedFolderId(null)}
-                className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-all flex items-center gap-2 text-sm font-bold"
-               >
-                 <ChevronLeft size={18} />
-                 عودة للأضابير
-               </button>
-             ) : (
-               <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 rounded-xl p-0.5 border border-emerald-100 shadow-sm">
-                 <Briefcase size={16} className="mr-3 ml-1" />
-                 <select 
-                    value={projectFilterId}
-                    onChange={(e) => setProjectFilterId(e.target.value)}
-                    className="bg-transparent text-sm font-bold text-emerald-700 px-2 py-1.5 outline-none cursor-pointer"
-                 >
-                   <option value="all" className="bg-white text-slate-800">كل المشاريع</option>
-                   <option value="none" className="bg-white text-slate-800">بدون مشروع (عام)</option>
-                   {projects.map(p => (
-                     <option key={p.id} value={p.id} className="bg-white text-slate-800">{p.name}</option>
-                   ))}
-                 </select>
-               </div>
-             )}
-             {!selectedFolderId && (
-               <button 
-                onClick={() => setIsCreateFolderOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-100 transition-all border border-emerald-100 shadow-sm"
-               >
-                 <FolderPlus size={18} />
-                 إضبارة جديدة
-               </button>
-             )}
-          </div>
-        ) : (
-           <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-100 rounded-2xl text-amber-700">
-             <Star size={20} fill="currentColor" />
-             <div className="text-xs font-bold">
-               المخططات والخرائط والقرارات السيادية للشركة.
-             </div>
-           </div>
-        )}
-
-        <div className="flex gap-3">
-          <div className="relative">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-              type="text" 
-              placeholder="بحث سريع..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-64 pr-10 pl-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-            />
-          </div>
+          {(viewMode === 'folders' && !activeFolderId) && (
+            <button onClick={() => setIsCreateFolderOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-[11px] font-black shadow-lg shadow-emerald-100">
+              <FolderPlus size={16} /> أضبارة جديدة
+            </button>
+          )}
         </div>
       </div>
 
-      {viewMode === 'folders' && !selectedFolderId ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4">
-          {filteredFolders.map(folder => {
-            const docCount = documents.filter(d => d.folderId === folder.id).length;
-            const project = projects.find(p => p.id === folder.projectId);
-            return (
-              <div 
-                key={folder.id} 
-                onClick={() => setSelectedFolderId(folder.id)}
-                className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group relative"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`p-4 rounded-2xl ${folder.color || 'bg-emerald-500'} text-white shadow-lg`}>
-                    <FolderIcon size={32} />
-                  </div>
-                  <div className="relative">
-                    <button 
-                      onClick={(e) => toggleMenu(e, folder.id)}
-                      className="p-2 text-slate-300 hover:text-slate-500 hover:bg-slate-50 rounded-xl transition-all"
-                    >
-                      <MoreVertical size={20} />
-                    </button>
+      <div className="relative w-full md:w-80">
+        <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+        <input type="text" placeholder={`بحث في ${activeFolderId ? activeFolder?.name : 'الأرشيف'}...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pr-10 pl-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[11px] outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-black" />
+      </div>
+
+      {viewMode === 'folders' && !activeFolderId ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in duration-300">
+           {filteredFolders.map(folder => {
+             const docCount = documents.filter(d => d.folderId === folder.id).length;
+             return (
+               <div key={folder.id} onClick={() => setActiveFolderId(folder.id)} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group flex flex-col items-center text-center relative">
+                  <div className="absolute top-4 left-4">
+                    <button onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === folder.id ? null : folder.id); }} className="p-1.5 text-slate-300 hover:text-slate-600 hover:bg-slate-50 rounded-lg"><MoreVertical size={16} /></button>
                     {activeMenu === folder.id && (
-                      <div className="absolute left-0 top-full mt-2 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl z-20 py-2 animate-in fade-in zoom-in-95 origin-top-left">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); onRenameFolder?.(folder.id, folder.name); setActiveMenu(null); }}
-                          className="w-full text-right px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
-                        >
-                          <Edit3 size={14} /> إعادة تسمية الإضبارة
-                        </button>
-                        <hr className="my-1 border-slate-50" />
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); onDeleteFolder(folder.id); setActiveMenu(null); }}
-                          className="w-full text-right px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors"
-                        >
-                          <Trash2 size={14} /> نقل لسلة المهملات
-                        </button>
+                      <div className="absolute left-0 top-full mt-1 w-44 bg-white border border-slate-100 rounded-xl shadow-2xl z-20 py-1 animate-in zoom-in-95">
+                        {canEdit && <button onClick={(e) => { e.stopPropagation(); onRenameFolder?.(folder.id, folder.name); setActiveMenu(null); }} className="w-full text-right px-4 py-2.5 text-[10px] font-black text-slate-600 hover:bg-slate-50 flex items-center gap-2"><Edit3 size={12} /> إعادة تسمية</button>}
+                        <button className="w-full text-right px-4 py-2.5 text-[10px] font-black text-slate-600 hover:bg-slate-50 flex items-center gap-2"><Copy size={12} /> تكرار الإضبارة</button>
+                        {canDelete && <button onClick={(e) => { e.stopPropagation(); onDeleteFolder(folder.id); setActiveMenu(null); }} className="w-full text-right px-4 py-2.5 text-[10px] font-black text-red-600 hover:bg-red-50 flex items-center gap-2"><Trash2 size={12} /> حذف نهائي</button>}
                       </div>
                     )}
                   </div>
-                </div>
-                <h3 className="text-lg font-bold text-slate-800 mb-1">{folder.name}</h3>
-                
-                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 mb-4 bg-slate-50 p-2 rounded-lg">
-                  <Map size={12} />
-                  <span>المسار: {project ? project.name : 'أرشيف عام'}</span>
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                  <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
-                    {docCount} كتاب مؤرشف
-                  </span>
-                  <span className="text-[10px] text-slate-400">أنشئت في {new Date(folder.createdAt).toLocaleDateString('ar-EG')}</span>
-                </div>
-              </div>
-            );
-          })}
+                  <div className={`w-20 h-20 rounded-[1.8rem] ${folder.color || 'bg-emerald-500'} text-white shadow-xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-500`}>
+                     <FolderIcon size={36} fill="white" />
+                  </div>
+                  <h4 className="text-sm font-black text-slate-800 mb-1">{folder.name}</h4>
+                  <p className="text-[10px] font-bold text-slate-400">{docCount} كتاب مؤرشف</p>
+               </div>
+             );
+           })}
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
-          {filteredDocs.map((doc) => {
-            const project = projects.find(p => p.id === doc.projectId);
-            const folder = folders.find(f => f.id === doc.folderId);
-
-            return (
-              <div key={doc.id} className="relative group">
-                <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col h-full relative overflow-hidden">
-                  {doc.isPinned && (
-                    <div className="absolute -top-1 -right-1 p-2 bg-amber-400 text-white rounded-bl-2xl shadow-sm z-10">
-                      <Star size={14} fill="white" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 animate-in fade-in duration-300">
+          {filteredDocs.map((doc) => (
+            <div key={doc.id} onClick={() => onOpenUnit(doc)} className="group bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer flex flex-col aspect-square relative overflow-hidden">
+              {doc.isPinned && <div className="absolute top-0 left-0 p-2 bg-amber-400 text-white rounded-br-xl z-10"><Star size={12} fill="white" /></div>}
+              <div className="flex justify-between items-start mb-4">
+                <div className={`p-2.5 rounded-xl ${doc.type === DocType.INCOMING ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600 shadow-inner'}`}>
+                  {doc.type === DocType.INCOMING ? <FileDown size={20} /> : <FileUp size={20} />}
+                </div>
+                <div className="relative">
+                  <button onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === doc.id ? null : doc.id); }} className="p-1.5 text-slate-300 hover:text-slate-600 hover:bg-slate-50 rounded-lg"><MoreVertical size={18} /></button>
+                  {activeMenu === doc.id && (
+                    <div className="absolute left-0 top-full mt-1 w-44 bg-white border border-slate-100 rounded-xl shadow-2xl z-20 py-1 animate-in zoom-in-95">
+                      {canEdit && <button onClick={(e) => { e.stopPropagation(); onRenameDoc?.(doc.id, doc.subject); setActiveMenu(null); }} className="w-full text-right px-4 py-2.5 text-[10px] font-black text-slate-600 hover:bg-slate-50 flex items-center gap-2"><Edit3 size={12} /> إعادة تسمية</button>}
+                      <button onClick={(e) => { e.stopPropagation(); onDuplicateDoc?.(doc); setActiveMenu(null); }} className="w-full text-right px-4 py-2.5 text-[10px] font-black text-slate-600 hover:bg-slate-50 flex items-center gap-2"><Copy size={12} /> تكرار الكتاب</button>
+                      <button onClick={(e) => { e.stopPropagation(); onTogglePin?.(doc.id); setActiveMenu(null); }} className="w-full text-right px-4 py-2.5 text-[10px] font-black text-slate-600 hover:bg-slate-50 flex items-center gap-2"><Star size={12} /> {doc.isPinned ? 'إزالة من المركزية' : 'تثبيت كوثيقة مركزية'}</button>
+                      {canDelete && <button onClick={(e) => { e.stopPropagation(); onDeleteDoc(doc.id); setActiveMenu(null); }} className="w-full text-right px-4 py-2.5 text-[10px] font-black text-red-600 hover:bg-red-50 flex items-center gap-2"><Trash2 size={12} /> حذف</button>}
                     </div>
                   )}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-3 rounded-2xl ${doc.type === DocType.INCOMING ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                        {doc.type === DocType.INCOMING ? <FileDown size={24} /> : <FileUp size={24} />}
-                      </div>
-                      <div>
-                        <h4 className="text-lg font-bold text-slate-800 line-clamp-1 pr-12 lg:pr-0">{doc.subject}</h4>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs font-bold text-slate-400">رقم: {doc.refNumber}</span>
-                          <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                          <span className="text-xs font-bold text-slate-400">{doc.date}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="relative">
-                      <button 
-                        onClick={(e) => toggleMenu(e, doc.id)}
-                        className="p-2 text-slate-300 hover:text-slate-500 hover:bg-slate-50 rounded-xl transition-all"
-                      >
-                        <MoreVertical size={20} />
-                      </button>
-                      {activeMenu === doc.id && (
-                        <div className="absolute left-0 top-full mt-2 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl z-20 py-2 animate-in fade-in zoom-in-95 origin-top-left">
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); onTogglePin?.(doc.id); setActiveMenu(null); }}
-                            className="w-full text-right px-4 py-2.5 text-xs font-bold text-amber-600 hover:bg-amber-50 flex items-center gap-3 transition-colors"
-                          >
-                            <Star size={14} fill={doc.isPinned ? "currentColor" : "none"} />
-                            {doc.isPinned ? 'إزالة من المركزية' : 'تمييز كـ وثيقة مركزية'}
-                          </button>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); onRenameDoc?.(doc.id, doc.subject); setActiveMenu(null); }}
-                            className="w-full text-right px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
-                          >
-                            <Edit3 size={14} /> إعادة تسمية الكتاب
-                          </button>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); onDuplicateDoc?.(doc); setActiveMenu(null); }}
-                            className="w-full text-right px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
-                          >
-                            <Copy size={14} /> تكرار الكتاب
-                          </button>
-                          <hr className="my-1 border-slate-50" />
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); onDeleteDoc(doc.id); setActiveMenu(null); }}
-                            className="w-full text-right px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors"
-                          >
-                            <Trash2 size={14} /> نقل لسلة المهملات
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex-1">
-                    <div className="bg-slate-50 p-2.5 rounded-xl mb-4 border border-slate-100">
-                       <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 truncate uppercase tracking-tight">
-                         <Map size={10} className="text-emerald-500" />
-                         <span>المسار: {project ? project.name : 'أرشيف عام'} / {folder ? folder.name : 'بدون إضبارة'}</span>
-                       </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${
-                        doc.status === DocStatus.NEW ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
-                      }`}>
-                        {doc.status}
-                      </span>
-                      {doc.attachments.length > 0 && (
-                        <span className="text-[10px] font-bold px-2 py-1 bg-slate-100 text-slate-500 rounded flex items-center gap-1">
-                          <Paperclip size={10} />
-                          {doc.attachments.length} مرفقات
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-slate-500 mb-4 line-clamp-2 leading-relaxed">
-                      {doc.notes || "لا توجد ملاحظات إضافية لهذا الكتاب المؤرشف."}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-4 border-t border-slate-50 mt-auto">
-                    <div className="flex items-center gap-3 text-xs text-slate-400 font-bold uppercase tracking-widest">
-                       بواسطة آدمن النظام
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button 
-                        onClick={() => onOpenUnit(doc)}
-                        className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95"
-                      >
-                        <Eye size={16} />
-                        فتح الكتاب
-                      </button>
-                    </div>
-                  </div>
                 </div>
               </div>
-            );
-          })}
+              <div className="flex-1 space-y-2">
+                <h4 className="text-[12px] font-black text-slate-800 leading-snug line-clamp-2">{doc.subject}</h4>
+                <p className="text-[10px] font-bold text-slate-400 line-clamp-1">من: {doc.sender}</p>
+              </div>
+              <div className="pt-3 border-t border-slate-50 mt-auto flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-2.5 py-1 rounded-md">#{doc.refNumber}</span>
+                  <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400"><Clock size={12} /> {doc.date}</div>
+                </div>
+                <div className="flex items-center justify-between">
+                   <div className="flex items-center gap-1.5">
+                     <span className={`w-2 h-2 rounded-full ${doc.status === DocStatus.NEW ? 'bg-blue-500 shadow-blue-200' : 'bg-emerald-500 shadow-emerald-200'} shadow-lg animate-pulse`}></span>
+                     <span className="text-[9px] font-black text-slate-500 tracking-tight">{doc.status}</span>
+                   </div>
+                   {doc.attachments.length > 0 && <div className="flex items-center gap-1 text-[9px] font-black text-slate-300"><Paperclip size={10} /> {doc.attachments.length}</div>}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

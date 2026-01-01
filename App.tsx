@@ -11,9 +11,10 @@ import ProjectList from './components/ProjectList';
 import ProjectDetailsView from './components/ProjectDetailsView';
 import CreateProjectModal from './components/CreateProjectModal';
 import MessagingPage from './components/MessagingPage';
+import EmployeePortal from './components/EmployeePortal';
 import ConfirmModal from './components/ConfirmModal';
 import { MOCK_DOCUMENTS, MOCK_FOLDERS, MOCK_PROJECTS, MOCK_DEPARTMENTS, MOCK_EMPLOYEES, CURRENT_USER } from './constants';
-import { Document, Folder, Attachment, Project, Department, User } from './types';
+import { Document, Folder, Attachment, Project, Department, User, WorkflowTask, DocStatus } from './types';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -21,133 +22,73 @@ const App: React.FC = () => {
   const [activeProjectView, setActiveProjectView] = useState<'list' | 'details'>('list');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
+  const [userRoleView, setUserRoleView] = useState<'admin' | 'employee'>('admin'); 
   
-  // Settings State
   const [autoOpenFiles, setAutoOpenFiles] = useState(true);
-  
-  // Data States
   const [documents, setDocuments] = useState<Document[]>(MOCK_DOCUMENTS);
   const [folders, setFolders] = useState<Folder[]>(MOCK_FOLDERS);
   const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS);
   const [departments, setDepartments] = useState<Department[]>(MOCK_DEPARTMENTS);
   const [employees, setEmployees] = useState<User[]>(MOCK_EMPLOYEES);
   
-  // Selection Context
   const [currentDocument, setCurrentDocument] = useState<Document | null>(null);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
 
-  // Confirmation Modals State
-  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string; type: 'doc' | 'folder' | 'project' | 'department' }>({ isOpen: false, id: '', type: 'doc' });
-  const [confirmRestore, setConfirmRestore] = useState<{ isOpen: boolean; item: any; type: 'doc' | 'folder' }>({ isOpen: false, item: null, type: 'doc' });
+  // Deletion State
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'doc' | 'folder' } | null>(null);
 
-  // Actions
-  const handleAddDocument = (newDoc: Document) => setDocuments([newDoc, ...documents]);
-  const handleAddFolder = (newFolder: Folder) => setFolders([newFolder, ...folders]);
-  const handleAddProject = (newProject: Project) => setProjects([newProject, ...projects]);
+  const handleAddDocument = (newDoc: Document) => setDocuments([{...newDoc, tasks: []}, ...documents]);
 
   const handleOpenUnit = (doc: Document) => {
     setCurrentDocument(doc);
     setActiveView('details');
   };
 
-  const handleTogglePin = (id: string) => {
-    setDocuments(prev => prev.map(d => d.id === id ? { ...d, isPinned: !d.isPinned } : d));
+  const handleAddTask = (docId: string, task: WorkflowTask) => {
+    setDocuments(prev => prev.map(d => 
+      d.id === docId ? { ...d, tasks: [...(d.tasks || []), task], status: DocStatus.IN_PROGRESS } : d
+    ));
+    if (currentDocument?.id === docId) {
+      setCurrentDocument(prev => prev ? { ...prev, tasks: [...(prev.tasks || []), task], status: DocStatus.IN_PROGRESS } : null);
+    }
+  };
+
+  const executeDelete = () => {
+    if (!confirmDelete) return;
+    if (confirmDelete.type === 'doc') {
+      setDocuments(prev => prev.map(d => d.id === confirmDelete.id ? { ...d, deletedAt: new Date().toISOString() } : d));
+    } else {
+      setFolders(prev => prev.map(f => f.id === confirmDelete.id ? { ...f, deletedAt: new Date().toISOString() } : f));
+    }
+    setConfirmDelete(null);
   };
 
   const handleDuplicateDoc = (doc: Document) => {
-    const newDoc = {
+    const newDoc: Document = {
       ...doc,
       id: Math.random().toString(36).substr(2, 9),
-      subject: `${doc.subject} (نسخة مكررة)`,
-      refNumber: `${doc.refNumber}-نسخة`,
+      subject: `${doc.subject} (نسخة)`,
+      refNumber: `${doc.refNumber}-COPY`,
       date: new Date().toISOString().split('T')[0],
-      isPinned: false
+      tasks: [],
+      status: DocStatus.NEW
     };
     setDocuments([newDoc, ...documents]);
   };
 
-  const handleRenameDoc = (id: string, currentName: string) => {
-    const newName = prompt('تغيير موضوع الكتاب:', currentName);
+  const handleRenameDoc = (id: string) => {
+    const newName = prompt('أدخل الاسم الجديد للكتاب:');
     if (newName && newName.trim()) {
       setDocuments(prev => prev.map(d => d.id === id ? { ...d, subject: newName } : d));
     }
   };
 
-  const handleRenameFolder = (id: string, currentName: string) => {
-    const newName = prompt('تغيير اسم الإضبارة:', currentName);
+  const handleRenameFolder = (id: string) => {
+    const newName = prompt('أدخل الاسم الجديد للأضبارة:');
     if (newName && newName.trim()) {
       setFolders(prev => prev.map(f => f.id === id ? { ...f, name: newName } : f));
     }
   };
-
-  const handleRenameProject = (id: string, currentName: string) => {
-    const newName = prompt('تغيير اسم المشروع:', currentName);
-    if (newName && newName.trim()) {
-      setProjects(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p));
-    }
-  };
-
-  const processDelete = () => {
-    const { id, type } = confirmDelete;
-    if (type === 'doc') {
-      setDocuments(prev => prev.map(d => d.id === id ? { ...d, deletedAt: new Date().toISOString() } : d));
-      if (currentDocument?.id === id) {
-        setActiveView('list');
-        setCurrentDocument(null);
-      }
-    } else if (type === 'folder') {
-      setFolders(prev => prev.map(f => f.id === id ? { ...f, deletedAt: new Date().toISOString() } : f));
-    } else if (type === 'project') {
-      setProjects(prev => prev.filter(p => p.id !== id));
-      setDocuments(prev => prev.map(d => d.projectId === id ? { ...d, deletedAt: new Date().toISOString() } : d));
-      if (currentProject?.id === id) {
-        setActiveProjectView('list');
-        setCurrentProject(null);
-      }
-    } else if (type === 'department') {
-      if (CURRENT_USER.role !== 'admin') {
-        alert('ليس لديك صلاحية لحذف الأقسام');
-        return;
-      }
-      setDepartments(prev => prev.filter(d => d.id !== id));
-    }
-    setConfirmDelete({ isOpen: false, id: '', type: 'doc' });
-  };
-
-  const processRestore = () => {
-    const { item, type } = confirmRestore;
-    if (type === 'doc') {
-      setDocuments(prev => prev.map(d => d.id === item.id ? { ...d, deletedAt: null } : d));
-    } else {
-      setFolders(prev => prev.map(f => f.id === item.id ? { ...f, deletedAt: null } : f));
-    }
-    setConfirmRestore({ isOpen: false, item: null, type: 'doc' });
-  };
-
-  const handleArchiveReceivedFile = (file: any) => {
-    // Open the add document modal with the file pre-attached
-    // For now, just a simplified simulation:
-    const confirmArchiving = confirm(`هل تريد أرشفة الملف "${file.name}"؟`);
-    if (confirmArchiving) {
-      setIsAddModalOpen(true);
-      // In a real implementation, we would pass the file to the modal's state
-    }
-  };
-
-  // Breadcrumbs Logic
-  const breadcrumbs = useMemo(() => {
-    const crumbs = [];
-    if (currentProject) {
-      crumbs.push({ 
-        label: currentProject.name, 
-        onClick: () => { setActiveProjectView('details'); setActiveTab('projects'); } 
-      });
-    }
-    if (currentDocument) {
-      crumbs.push({ label: currentDocument.subject });
-    }
-    return crumbs;
-  }, [currentProject, currentDocument]);
 
   const renderContent = () => {
     const activeDocs = documents.filter(d => !d.deletedAt);
@@ -161,131 +102,72 @@ const App: React.FC = () => {
           doc={currentDocument} 
           autoOpenFiles={autoOpenFiles}
           onBack={() => { setActiveView('list'); setCurrentDocument(null); }} 
-          onDelete={() => setConfirmDelete({ isOpen: true, id: currentDocument.id, type: 'doc' })}
+          onDelete={() => setConfirmDelete({ id: currentDocument.id, type: 'doc' })}
           onAddAttachment={(at) => {
             const updated = documents.map(d => d.id === currentDocument.id ? {...d, attachments: [...d.attachments, at]} : d);
             setDocuments(updated);
             setCurrentDocument(updated.find(d => d.id === currentDocument.id) || null);
           }}
-        />
-      );
-    }
-
-    if (activeTab === 'documents') {
-      return (
-        <DocumentList 
-          documents={activeDocs} 
-          folders={activeFolders} 
-          projects={projects}
-          onAddFolder={handleAddFolder} 
-          onOpenUnit={handleOpenUnit}
-          onDeleteDoc={(id) => setConfirmDelete({ isOpen: true, id, type: 'doc' })}
-          onDeleteFolder={(id) => setConfirmDelete({ isOpen: true, id, type: 'folder' })}
-          onRenameDoc={handleRenameDoc}
-          onRenameFolder={handleRenameFolder}
-          onDuplicateDoc={handleDuplicateDoc}
-          onTogglePin={handleTogglePin}
+          onAddTask={handleAddTask}
         />
       );
     }
 
     switch (activeTab) {
-      case 'dashboard': return <Dashboard documents={activeDocs} />;
-      case 'messages': return (
-        <MessagingPage 
-          documents={activeDocs} 
-          folders={activeFolders} 
-          onArchiveFile={handleArchiveReceivedFile}
-        />
-      );
-      case 'settings': return (
-        <SettingsPage 
-          deletedDocs={deletedDocs} 
-          deletedFolders={deletedFolders} 
-          autoOpenFiles={autoOpenFiles}
-          setAutoOpenFiles={setAutoOpenFiles}
-          onRestoreDoc={(doc) => setConfirmRestore({ isOpen: true, item: doc, type: 'doc' })} 
-          onRestoreFolder={(f) => setConfirmRestore({ isOpen: true, item: f, type: 'folder' })} 
-          departments={departments}
-          setDepartments={setDepartments}
-          onDeleteDepartment={(id) => setConfirmDelete({ isOpen: true, id, type: 'department' })}
-        />
-      );
-      case 'invites': return (
-        <InviteManagement 
-          departments={departments} 
-          employees={employees} 
-          setEmployees={setEmployees}
-        />
-      );
-      case 'projects':
-        if (activeProjectView === 'details' && currentProject) {
-          return (
-            <ProjectDetailsView 
-              project={currentProject}
-              documents={activeDocs}
-              folders={activeFolders}
-              onBack={() => { setActiveProjectView('list'); setCurrentProject(null); }}
-              onOpenDoc={handleOpenUnit}
-            />
-          );
-        }
+      case 'dashboard': return <Dashboard documents={activeDocs} onOpenDoc={handleOpenUnit} />;
+      case 'documents': 
         return (
-          <ProjectList 
+          <DocumentList 
+            documents={activeDocs} 
+            folders={activeFolders} 
             projects={projects}
-            documents={activeDocs}
-            onSelectProject={(p) => { setCurrentProject(p); setActiveProjectView('details'); }}
-            onAddProject={() => setIsAddProjectModalOpen(true)}
-            onDeleteProject={(id) => setConfirmDelete({ isOpen: true, id, type: 'project' })}
-            onRenameProject={handleRenameProject}
+            onAddFolder={(f) => setFolders([...folders, f])} 
+            onOpenUnit={handleOpenUnit}
+            onDeleteDoc={(id) => setConfirmDelete({ id, type: 'doc' })}
+            onDeleteFolder={(id) => setConfirmDelete({ id, type: 'folder' })}
+            onRenameDoc={handleRenameDoc}
+            onRenameFolder={handleRenameFolder}
+            onDuplicateDoc={handleDuplicateDoc}
+            onTogglePin={(id) => setDocuments(prev => prev.map(d => d.id === id ? { ...d, isPinned: !d.isPinned } : d))}
           />
         );
-      default: return <Dashboard documents={activeDocs} />;
+      case 'my-tasks': return <EmployeePortal documents={activeDocs} onOpenDoc={handleOpenUnit} />;
+      case 'messages': return <MessagingPage documents={activeDocs} folders={activeFolders} onArchiveFile={()=>{}} />;
+      case 'projects':
+        if (activeProjectView === 'details' && currentProject) return <ProjectDetailsView project={currentProject} documents={activeDocs} folders={activeFolders} onBack={()=>{setActiveProjectView('list');setCurrentProject(null)}} onOpenDoc={handleOpenUnit} />;
+        return <ProjectList projects={projects} documents={activeDocs} onSelectProject={(p)=>{setCurrentProject(p);setActiveProjectView('details')}} onAddProject={()=>setIsAddProjectModalOpen(true)} />;
+      case 'invites': return <InviteManagement departments={departments} employees={employees} setEmployees={setEmployees} />;
+      case 'settings': return <SettingsPage deletedDocs={deletedDocs} deletedFolders={deletedFolders} autoOpenFiles={autoOpenFiles} setAutoOpenFiles={setAutoOpenFiles} onRestoreDoc={(doc)=>setDocuments(documents.map(d=>d.id===doc.id?{...d,deletedAt:null}:d))} onRestoreFolder={(f)=>setFolders(folders.map(fo=>fo.id===f.id?{...fo,deletedAt:null}:fo))} departments={departments} setDepartments={setDepartments} onDeleteDepartment={(id)=>setDepartments(departments.filter(d=>d.id!==id))} />;
+      default: return <Dashboard documents={activeDocs} onOpenDoc={handleOpenUnit} />;
     }
   };
 
   return (
-    <Layout 
-      activeTab={activeTab} 
-      setActiveTab={(t) => { setActiveTab(t); setCurrentProject(null); setCurrentDocument(null); setActiveView('list'); setActiveProjectView('list'); }} 
-      onAddClick={() => setIsAddModalOpen(true)}
-      breadcrumbs={breadcrumbs}
-    >
-      {renderContent()}
-      <AddDocumentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddDocument} folders={folders.filter(f => !f.deletedAt)} />
-      <CreateProjectModal isOpen={isAddProjectModalOpen} onClose={() => setIsAddProjectModalOpen(false)} onSave={handleAddProject} />
+    <Layout activeTab={activeTab} setActiveTab={(t)=>{setActiveTab(t);setActiveView('list');setActiveProjectView('list')}} onAddClick={()=>setIsAddModalOpen(true)}>
+      <div className="fixed bottom-6 left-6 z-[100] flex gap-2">
+         <button onClick={() => setUserRoleView(userRoleView === 'admin' ? 'employee' : 'admin')} className="bg-slate-800 text-white px-4 py-2 rounded-full text-[10px] font-black shadow-2xl hover:bg-slate-700 transition-all border border-slate-600">
+           تبديل البوابة: {userRoleView === 'admin' ? 'المدير' : 'الموظف'}
+         </button>
+      </div>
       
+      {userRoleView === 'employee' && activeTab === 'dashboard' ? (
+        <EmployeePortal documents={documents} onOpenDoc={handleOpenUnit} />
+      ) : renderContent()}
+
+      <AddDocumentModal isOpen={isAddModalOpen} onClose={()=>setIsAddModalOpen(false)} onAdd={handleAddDocument} folders={folders} />
+      <CreateProjectModal isOpen={isAddProjectModalOpen} onClose={()=>setIsAddProjectModalOpen(false)} onSave={(p)=>setProjects([...projects,p])} />
+
       <ConfirmModal 
-        isOpen={confirmDelete.isOpen} 
-        title={
-          confirmDelete.type === 'project' ? "تأكيد حذف المشروع" : 
-          confirmDelete.type === 'folder' ? "تأكيد حذف الإضبارة" : 
-          confirmDelete.type === 'department' ? "تأكيد حذف القسم" : "تأكيد الحذف"
-        }
-        message={
-          confirmDelete.type === 'project' ? "تحذير: سيتم حذف المشروع وكافة الكتب المرتبطة به. هذا الإجراء خطير جداً." : 
-          confirmDelete.type === 'department' ? "تحذير: سيتم حذف هذا القسم نهائياً. يرجى التأكد من نقل الموظفين التابعين له أولاً." :
-          "هل أنت متأكد من رغبتك في حذف هذا العنصر؟"
-        }
-        confirmLabel="نعم، حذف نهائي"
-        cancelLabel="تراجع"
-        requireTextConfirmation={confirmDelete.type === 'project' || confirmDelete.type === 'folder' || confirmDelete.type === 'department'}
-        onConfirm={processDelete}
-        onCancel={() => setConfirmDelete({ isOpen: false, id: '', type: 'doc' })}
-        type="danger"
-      />
-      <ConfirmModal 
-        isOpen={confirmRestore.isOpen} 
-        title="استرجاع العنصر"
-        message="سيتم استرجاع العنصر إلى مكانه الأصلي في الأرشيف."
-        confirmLabel="استرجاع الآن"
+        isOpen={!!confirmDelete} 
+        title={confirmDelete?.type === 'doc' ? 'حذف الوثيقة' : 'حذف الأضبارة'}
+        message={confirmDelete?.type === 'doc' ? 'هل أنت متأكد من نقل هذا الكتاب إلى سلة المهملات؟' : 'سيتم نقل الأضبارة وجميع ارتباطاتها لسلة المهملات.'}
+        confirmLabel="نعم، حذف"
         cancelLabel="إلغاء"
-        onConfirm={processRestore}
-        onCancel={() => setConfirmRestore({ isOpen: false, item: null, type: 'doc' })}
-        type="success"
+        onConfirm={executeDelete}
+        onCancel={() => setConfirmDelete(null)}
+        requireTextConfirmation={true}
       />
     </Layout>
   );
 };
-
 export default App;

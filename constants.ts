@@ -30,16 +30,19 @@ export const MOCK_DOCUMENTS: Document[] = [
     date: '2023-11-20',
     sender: 'وزارة الإسكان',
     receiver: 'القسم الهندسي',
-    subject: 'طلب اعتماد مخططات المرحلة الثانية',
+    subject: 'طلب اعتماد مخططات المرحلة الثانية والموافقة على التعديلات الفنية',
     department: 'الهندسة',
     projectId: 'p2',
     folderId: 'f2',
     tags: ['اعتماد', 'مخططات'],
     notes: 'مستعجل جداً ورسمي',
-    status: DocStatus.NEW,
+    status: DocStatus.IN_PROGRESS,
     attachments: [
       { id: 'a1', name: 'مخطط_الموقع.pdf', type: 'application/pdf', size: '2.4 MB', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
       { id: 'a2', name: 'صورة_الموقع_1.jpg', type: 'image/jpeg', size: '1.1 MB', url: 'https://picsum.photos/seed/doc1/1200/800' }
+    ],
+    tasks: [
+      { id: 't1', assigneeIds: ['u1'], dueDate: '2024-05-30', instructions: 'يرجى مراجعة المخططات وإبداء الرأي الفني حول التعديلات.', status: 'pending', createdAt: '2024-05-01' }
     ]
   },
   {
@@ -49,7 +52,7 @@ export const MOCK_DOCUMENTS: Document[] = [
     date: '2023-11-22',
     sender: 'المدير العام',
     receiver: 'أمانة العاصمة',
-    subject: 'تقرير سير العمل الشهري',
+    subject: 'تقرير سير العمل الشهري وتدقيق الحسابات',
     department: 'الإدارة',
     projectId: 'p1',
     folderId: 'f1',
@@ -58,6 +61,30 @@ export const MOCK_DOCUMENTS: Document[] = [
     status: DocStatus.RESPONDED,
     attachments: [
       { id: 'a3', name: 'التقرير_الفني.pdf', type: 'application/pdf', size: '3.1 MB', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' }
+    ],
+    tasks: [
+      { id: 't2', assigneeIds: ['u1'], dueDate: '2024-03-10', instructions: 'أرشفة التقرير النهائي بعد التوقيع.', status: 'completed', createdAt: '2024-03-01' }
+    ]
+  },
+  {
+    id: 'd3',
+    type: DocType.INCOMING,
+    refNumber: 'LAW-2024-012',
+    date: '2024-05-05',
+    sender: 'المكتب القانوني',
+    receiver: 'الإدارة العامة',
+    subject: 'مراجعة مسودة عقد توريد المواد الأساسية',
+    department: 'القانونية',
+    projectId: 'p1',
+    folderId: 'f3',
+    tags: ['عقود', 'قانوني'],
+    notes: 'تحتاج رد خلال 48 ساعة',
+    status: DocStatus.IN_PROGRESS,
+    attachments: [
+      { id: 'a4', name: 'مسودة_العقد.pdf', type: 'application/pdf', size: '1.2 MB', url: '#' }
+    ],
+    tasks: [
+      { id: 't3', assigneeIds: ['u1'], dueDate: '2024-05-25', instructions: 'يرجى تدقيق البند الخامس الخاص بالغرامات التأخيرية.', status: 'pending', createdAt: '2024-05-05' }
     ]
   }
 ];

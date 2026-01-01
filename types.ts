@@ -51,6 +51,15 @@ export interface Folder {
   projectId?: string;
 }
 
+export interface WorkflowTask {
+  id: string;
+  assigneeIds: string[];
+  dueDate: string;
+  instructions: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'overdue';
+  createdAt: string;
+}
+
 export interface Document {
   id: string;
   type: DocType;
@@ -69,6 +78,7 @@ export interface Document {
   deletedAt?: string | null;
   isSleeve?: boolean;
   isPinned?: boolean;
+  tasks: WorkflowTask[]; // Changed from task? to tasks[]
 }
 
 export interface Project {
@@ -86,7 +96,7 @@ export interface Message {
   text?: string;
   timestamp: string;
   attachment?: Attachment;
-  archivedDocId?: string; // Reference to a document in the archive
+  archivedDocId?: string;
   isVoice?: boolean;
   isRead?: boolean;
 }
