@@ -23,7 +23,7 @@ import {
   Mail,
   Reply
 } from 'lucide-react';
-import { CURRENT_USER } from '../constants';
+import { CURRENT_USER, MOCK_MESSAGES, MOCK_DOCUMENTS } from '../constants';
 
 interface Breadcrumb {
   label: string;
@@ -64,12 +64,16 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAd
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
+  // Check for Sidebar Red Dots
+  const hasUnreadMessages = MOCK_MESSAGES.some(m => m.receiverId === CURRENT_USER.id && !m.isRead);
+  const hasPendingTasks = MOCK_DOCUMENTS.some(d => d.tasks?.some(t => t.assigneeIds.includes(CURRENT_USER.id) && t.status === 'pending'));
+
   const menuItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
     { id: 'documents', label: 'الأرشيف العام', icon: FileText },
     { id: 'projects', label: 'المشاريع الهندسية', icon: Briefcase },
-    { id: 'my-tasks', label: 'مهامي وتوجيهاتي', icon: ClipboardList },
-    { id: 'messages', label: 'المراسلات الداخلية', icon: MessageSquare },
+    { id: 'my-tasks', label: 'مهامي وتوجيهاتي', icon: ClipboardList, hasDot: hasPendingTasks },
+    { id: 'messages', label: 'المراسلات الداخلية', icon: MessageSquare, hasDot: hasUnreadMessages },
     { id: 'invites', label: 'إدارة الكوادر', icon: Users },
     { id: 'settings', label: 'الإعدادات والنظام', icon: Settings },
   ];
@@ -140,6 +144,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAd
               >
                 <Icon size={18} className={`${activeTab === item.id ? 'text-emerald-600' : ''} shrink-0 transition-transform group-hover:scale-110`} />
                 {!isCollapsed && <span className="flex-1 text-right truncate">{item.label}</span>}
+                
+                {/* Red Dot Notification - Nazk Style */}
+                {item.hasDot && (
+                  <span className={`absolute left-4 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-red-500 rounded-full ring-2 ring-white shadow-sm ${isCollapsed ? 'left-2 top-2 translate-y-0' : ''}`}></span>
+                )}
               </button>
             );
           })}

@@ -1,7 +1,7 @@
 
 import React from 'react';
 /* Added missing SendHorizontal import */
-import { FileDown, FileUp, Clock, CheckCircle2, TrendingUp, Search, UserCheck, AlertTriangle, ArrowUpRight, SendHorizontal } from 'lucide-react';
+import { FileDown, FileUp, Clock, CheckCircle2, TrendingUp, Search, UserCheck, AlertTriangle, ArrowUpRight, SendHorizontal, Users } from 'lucide-react';
 import { DocType, Document, WorkflowTask } from '../types';
 import { MOCK_EMPLOYEES } from '../constants';
 
@@ -13,10 +13,10 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ documents, onOpenDoc }) => {
   const incomingCount = documents.filter(d => d.type === DocType.INCOMING).length;
   const outgoingCount = documents.filter(d => d.type === DocType.OUTGOING).length;
-  const inProgressCount = documents.filter(d => d.status === 'قيد المتابعة' || !!d.task).length;
+  const inProgressCount = documents.filter(d => d.status === 'قيد المتابعة' || d.tasks?.some(t => t.status !== 'completed')).length;
   const closedCount = documents.filter(d => d.status === 'مغلق').length;
 
-  const taskedDocs = documents.filter(d => !!d.task && d.task.status !== 'completed');
+  const taskedDocs = documents.filter(d => d.tasks?.some(t => t.status !== 'completed'));
 
   const stats = [
     { label: 'الكتب الواردة', value: incomingCount, icon: FileDown, color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -66,7 +66,7 @@ const Dashboard: React.FC<DashboardProps> = ({ documents, onOpenDoc }) => {
         })}
       </div>
 
-      {/* Workflow Section */}
+      {/* Workflow Section - Redesigned Card for Issuer/Assignees */}
       {taskedDocs.length > 0 && (
         <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -76,24 +76,43 @@ const Dashboard: React.FC<DashboardProps> = ({ documents, onOpenDoc }) => {
              </div>
              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{taskedDocs.length} مهام معلقة</span>
           </div>
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
              {taskedDocs.slice(0, 3).map(doc => {
-               const emp = MOCK_EMPLOYEES.find(e => e.id === doc.task?.assigneeId);
+               // Get the most recent pending task
+               const activeTask = [...doc.tasks].reverse().find(t => t.status !== 'completed');
+               if (!activeTask) return null;
+
+               const issuer = MOCK_EMPLOYEES.find(e => e.id === activeTask.issuerId);
+               const assignees = MOCK_EMPLOYEES.filter(e => activeTask.assigneeIds.includes(e.id));
+
                return (
-                 <div key={doc.id} onClick={() => onOpenDoc?.(doc)} className="bg-slate-50 p-4 rounded-3xl border border-slate-100 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group">
-                    <div className="flex justify-between items-start mb-3">
+                 <div key={doc.id} onClick={() => onOpenDoc?.(doc)} className="bg-slate-50 p-5 rounded-[2.5rem] border border-slate-100 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group flex flex-col h-full">
+                    {/* Direction Flow - Nazk Design */}
+                    <div className="flex items-center justify-between mb-4 border-b border-slate-200/50 pb-3">
                       <div className="flex items-center gap-2">
-                        <img src={emp?.avatar} className="w-8 h-8 rounded-lg object-cover border border-white shadow-sm" alt="" />
-                        <span className="text-[11px] font-black text-slate-700">{emp?.name}</span>
+                        <img src={issuer?.avatar} className="w-7 h-7 rounded-lg object-cover border border-slate-200" title={`المُوجّه: ${issuer?.name}`} alt="" />
+                        <span className="text-[9px] font-black text-slate-400 uppercase">مِن</span>
                       </div>
-                      <div className="flex items-center gap-1 text-[9px] font-black text-amber-600 uppercase">
-                        <Clock size={12} /> {doc.task?.dueDate}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-black text-slate-400 uppercase">إلى</span>
+                        <div className="flex -space-x-1 flex-row-reverse">
+                          {assignees.map(a => (
+                            <img key={a.id} src={a.avatar} className="w-7 h-7 rounded-lg object-cover border-2 border-white shadow-sm ring-1 ring-slate-100" title={a.name} alt="" />
+                          ))}
+                        </div>
                       </div>
                     </div>
-                    <h4 className="text-xs font-black text-slate-800 line-clamp-1 mb-2">{doc.subject}</h4>
-                    <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                      <span className="text-[10px] font-bold text-slate-400">رقم: {doc.refNumber}</span>
-                      <ArrowUpRight size={14} className="text-slate-300 group-hover:text-emerald-600 transition-colors" />
+
+                    <h4 className="text-[12px] font-black text-slate-800 line-clamp-2 mb-3 leading-snug flex-1">{doc.subject}</h4>
+                    
+                    <div className="flex items-center justify-between pt-3 mt-auto border-t border-slate-100">
+                      <div className="flex items-center gap-1.5 text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">
+                        <Clock size={12} /> {activeTask.dueDate}
+                      </div>
+                      <div className="text-[9px] font-black text-slate-400 group-hover:text-emerald-600 transition-colors flex items-center gap-1">
+                        رقم: {doc.refNumber}
+                        <ArrowUpRight size={12} />
+                      </div>
                     </div>
                  </div>
                );
@@ -120,7 +139,7 @@ const Dashboard: React.FC<DashboardProps> = ({ documents, onOpenDoc }) => {
                   <div className="flex items-center justify-between">
                     <h4 className="font-bold text-slate-800">{doc.subject}</h4>
                     <div className="flex items-center gap-2">
-                      {doc.task && <span className="text-[9px] font-black px-2 py-1 bg-amber-100 text-amber-700 rounded-lg uppercase tracking-widest">موجه للمتابعة</span>}
+                      {doc.tasks?.some(t => t.status === 'pending') && <span className="text-[9px] font-black px-2 py-1 bg-amber-100 text-amber-700 rounded-lg uppercase tracking-widest">موجه للمتابعة</span>}
                       <span className="text-xs font-semibold px-2 py-1 bg-slate-100 text-slate-600 rounded-md">{doc.status}</span>
                     </div>
                   </div>

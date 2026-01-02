@@ -372,50 +372,48 @@ const MessagingPage: React.FC<MessagingPageProps> = ({ documents, folders, onArc
            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setPreviewDoc(null)}></div>
            <div className="relative w-full max-w-xl bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-in zoom-in-95 max-h-[90vh]">
               {/* Slim Header */}
-              <div className="p-4 px-8 border-b border-slate-100 flex flex-row-reverse items-center justify-between bg-white/95 backdrop-blur-md shrink-0">
+              <div className="p-3 px-8 border-b border-slate-100 flex flex-row-reverse items-center justify-between bg-white/95 backdrop-blur-md shrink-0">
                  <div className="flex flex-row-reverse items-center gap-3">
-                    <div className="p-2 bg-emerald-600 text-white rounded-xl shadow-lg"><ArchiveRestore size={18} /></div>
+                    <div className="p-2 bg-emerald-600 text-white rounded-xl shadow-lg"><ArchiveRestore size={16} /></div>
                     <div>
-                       <h4 className="font-black text-slate-800 text-[13px]">معاينة الوثيقة</h4>
-                       <p className="text-[9px] text-slate-400 font-black uppercase tracking-wider">الأرشيف الذكي</p>
+                       <h4 className="font-black text-slate-800 text-[12px]">معاينة الوثيقة</h4>
                     </div>
                  </div>
-                 <button onClick={() => setPreviewDoc(null)} className="p-2 hover:bg-slate-50 rounded-full text-slate-300 transition-all"><X size={22} /></button>
+                 <button onClick={() => setPreviewDoc(null)} className="p-1.5 hover:bg-slate-50 rounded-full text-slate-300 transition-all"><X size={20} /></button>
               </div>
 
               {/* Scrollable Content with Slim Design */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-[url('https://www.transparenttextures.com/patterns/clean-gray-paper.png')]">
-                 <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 space-y-4">
+              <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar bg-[url('https://www.transparenttextures.com/patterns/clean-gray-paper.png')]">
+                 <div className="bg-white p-4 rounded-[1.5rem] shadow-sm border border-slate-100 space-y-3">
                     <div className="flex flex-row-reverse items-center justify-between">
-                       <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-lg">المرجع: {previewDoc.refNumber}</span>
-                       <span className="text-[9px] font-black text-emerald-600 flex items-center gap-1"><Clock size={11} /> {previewDoc.date}</span>
+                       <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">المرجع: {previewDoc.refNumber}</span>
+                       <span className="text-[9px] font-black text-emerald-600 flex items-center gap-1"><Clock size={10} /> {previewDoc.date}</span>
                     </div>
-                    <h3 className="text-base font-black text-slate-800 leading-snug">{previewDoc.subject}</h3>
-                    <div className="grid grid-cols-2 gap-3">
-                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                          <p className="text-[8px] font-black text-slate-400 mb-0.5">جهة الإرسال</p>
-                          <p className="text-[11px] font-black text-slate-700 truncate">{previewDoc.sender}</p>
+                    <h3 className="text-[13px] font-black text-slate-800 leading-snug">{previewDoc.subject}</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                       <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                          <p className="text-[8px] font-black text-slate-400 mb-0.5 uppercase tracking-tighter">المرسل</p>
+                          <p className="text-[10px] font-black text-slate-700 truncate">{previewDoc.sender}</p>
                        </div>
-                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                          <p className="text-[8px] font-black text-slate-400 mb-0.5">الحالة</p>
-                          <p className="text-[11px] font-black text-amber-600">{previewDoc.status}</p>
+                       <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                          <p className="text-[8px] font-black text-slate-400 mb-0.5 uppercase tracking-tighter">الحالة</p>
+                          <p className="text-[10px] font-black text-amber-600">{previewDoc.status}</p>
                        </div>
                     </div>
                  </div>
 
-                 <div className="space-y-3">
-                    <h5 className="font-black text-slate-800 text-[11px] flex flex-row-reverse items-center gap-2 pr-1">المرفقات الرسمية ({previewDoc.attachments.length}) <PaperclipIcon size={12} className="text-emerald-500" /></h5>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                 <div className="space-y-2">
+                    <h5 className="font-black text-slate-800 text-[10px] flex flex-row-reverse items-center gap-2 pr-1 uppercase tracking-widest opacity-60">المرفقات ({previewDoc.attachments.length})</h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                        {previewDoc.attachments.map(file => (
                          <div 
                            key={file.id} 
                            onClick={(e) => { e.stopPropagation(); simulatePreviewDownload(file.id); }}
-                           className="p-3 bg-white border border-slate-100 rounded-[1.5rem] flex flex-row-reverse items-center gap-3 hover:shadow-lg hover:border-emerald-200 transition-all cursor-pointer group relative overflow-hidden"
+                           className="p-2.5 bg-white border border-slate-100 rounded-xl flex flex-row-reverse items-center gap-3 hover:shadow-md hover:border-emerald-200 transition-all cursor-pointer group relative overflow-hidden"
                          >
-                            <div className="p-2 bg-slate-50 text-slate-400 group-hover:bg-emerald-600 group-hover:text-white rounded-xl shadow-inner transition-all"><FileIcon size={16} /></div>
+                            <div className="p-2 bg-slate-50 text-slate-400 group-hover:bg-emerald-600 group-hover:text-white rounded-lg transition-all"><FileIcon size={14} /></div>
                             <div className="flex-1 overflow-hidden text-right">
                                <p className="text-[10px] font-black text-slate-800 truncate">{file.name}</p>
-                               <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">{file.size}</p>
                             </div>
                             <DownloadIconWithProgress size={14} isDownloading={downloadingId === file.id} progress={downloadProgress} />
                             
@@ -431,15 +429,15 @@ const MessagingPage: React.FC<MessagingPageProps> = ({ documents, folders, onArc
               </div>
 
               {/* Slim Footer */}
-              <div className="p-4 px-8 bg-slate-50 border-t border-slate-100 flex flex-row-reverse gap-3 shrink-0">
+              <div className="p-3 px-8 bg-slate-50 border-t border-slate-100 flex flex-row-reverse gap-3 shrink-0">
                  <button 
                    onClick={() => simulatePreviewDownload('all_preview')}
-                   className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 active:scale-95"
+                   className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-black text-xs shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 active:scale-95"
                  >
-                    <DownloadIconWithProgress size={16} isDownloading={downloadingId === 'all_preview'} progress={downloadProgress} />
+                    <DownloadIconWithProgress size={14} isDownloading={downloadingId === 'all_preview'} progress={downloadProgress} />
                     تنزيل الكل
                  </button>
-                 <button onClick={() => setPreviewDoc(null)} className="px-8 py-3 bg-white border border-slate-200 text-slate-500 rounded-xl font-black text-xs hover:bg-slate-100">إغلاق</button>
+                 <button onClick={() => setPreviewDoc(null)} className="px-6 py-2.5 bg-white border border-slate-200 text-slate-500 rounded-xl font-black text-xs hover:bg-slate-100">إغلاق</button>
               </div>
            </div>
         </div>

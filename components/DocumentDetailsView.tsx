@@ -6,7 +6,7 @@ import {
   PlusCircle, Paperclip, Check, FileSpreadsheet, 
   FileImage, FileCode, FileQuestion, SendHorizontal, 
   Clock, UserCheck, AlertCircle, Users, CheckSquare,
-  X, History, Plus, Edit3, Upload, FileUp
+  X, History, Plus, Edit3, Upload, FileUp, UserPlus
 } from 'lucide-react';
 import { Document, Attachment, User as UserType, WorkflowTask, DocStatus } from '../types';
 import { MOCK_EMPLOYEES, CURRENT_USER } from '../constants';
@@ -85,6 +85,7 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
     if (taskData.assigneeIds.length === 0 || !taskData.dueDate) return;
     const newTask: WorkflowTask = {
       id: Math.random().toString(36).substr(2, 9),
+      issuerId: CURRENT_USER.id,
       assigneeIds: taskData.assigneeIds,
       dueDate: taskData.dueDate,
       instructions: taskData.instructions,
@@ -206,18 +207,22 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
             <div className="space-y-4 max-h-[400px] overflow-y-auto px-1 custom-scrollbar">
                {doc.tasks && doc.tasks.length > 0 ? (
                  doc.tasks.map((task, idx) => {
-                   const employees = MOCK_EMPLOYEES.filter(e => task.assigneeIds.includes(e.id));
+                   const issuer = MOCK_EMPLOYEES.find(e => e.id === task.issuerId);
+                   const assignees = MOCK_EMPLOYEES.filter(e => task.assigneeIds.includes(e.id));
                    return (
                      <div key={task.id} className="bg-slate-50/50 p-5 rounded-[2rem] border border-slate-100 space-y-4 animate-in slide-in-from-top-4">
-                        <div className="flex items-center justify-between">
-                           <span className="text-[9px] font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100/50 shadow-sm">توجيه #{idx + 1}</span>
+                        <div className="flex items-center justify-between border-b border-slate-200/50 pb-3">
+                           <div className="flex items-center gap-2">
+                             <img src={issuer?.avatar} className="w-6 h-6 rounded-lg object-cover border border-indigo-100" title={`المُوجّه: ${issuer?.name}`} alt="" />
+                             <span className="text-[8px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md shadow-sm">توجيه #{idx + 1}</span>
+                           </div>
                            <div className="flex flex-row-reverse flex-wrap gap-1">
-                             {employees.map(e => <img key={e.id} src={e.avatar} className="w-6 h-6 rounded-lg object-cover border-2 border-white shadow-sm" title={e.name} alt="" />)}
+                             {assignees.map(e => <img key={e.id} src={e.avatar} className="w-6 h-6 rounded-lg object-cover border border-white shadow-sm ring-1 ring-slate-100" title={e.name} alt="" />)}
                            </div>
                         </div>
                         <p className="text-[11px] font-bold text-slate-700 italic bg-white p-3 rounded-2xl border border-slate-100 leading-relaxed shadow-sm">"{task.instructions}"</p>
                         <div className="flex flex-row-reverse justify-between text-[8px] font-black text-slate-400 opacity-60">
-                           <span>تاريخ الاستحقاق: {task.dueDate}</span>
+                           <span className="flex items-center gap-1"><Calendar size={10} /> {task.dueDate}</span>
                            <span className="flex items-center gap-1 uppercase tracking-widest"><Clock size={10} /> {task.status}</span>
                         </div>
                      </div>

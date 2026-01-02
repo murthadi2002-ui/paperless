@@ -53,7 +53,8 @@ export interface Folder {
 
 export interface WorkflowTask {
   id: string;
-  assigneeIds: string[];
+  issuerId: string; // The person who issued the direction
+  assigneeIds: string[]; // The people assigned to the direction
   dueDate: string;
   instructions: string;
   status: 'pending' | 'in_progress' | 'completed' | 'overdue';
@@ -78,7 +79,7 @@ export interface Document {
   deletedAt?: string | null;
   isSleeve?: boolean;
   isPinned?: boolean;
-  tasks: WorkflowTask[]; // Changed from task? to tasks[]
+  tasks: WorkflowTask[];
 }
 
 export interface Project {

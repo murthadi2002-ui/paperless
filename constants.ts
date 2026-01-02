@@ -42,7 +42,7 @@ export const MOCK_DOCUMENTS: Document[] = [
       { id: 'a2', name: 'صورة_الموقع_1.jpg', type: 'image/jpeg', size: '1.1 MB', url: 'https://picsum.photos/seed/doc1/1200/800' }
     ],
     tasks: [
-      { id: 't1', assigneeIds: ['u1'], dueDate: '2024-05-30', instructions: 'يرجى مراجعة المخططات وإبداء الرأي الفني حول التعديلات.', status: 'pending', createdAt: '2024-05-01' }
+      { id: 't1', issuerId: 'u1', assigneeIds: ['u2', 'u3'], dueDate: '2024-05-30', instructions: 'يرجى مراجعة المخططات وإبداء الرأي الفني حول التعديلات.', status: 'pending', createdAt: '2024-05-01' }
     ]
   },
   {
@@ -63,7 +63,7 @@ export const MOCK_DOCUMENTS: Document[] = [
       { id: 'a3', name: 'التقرير_الفني.pdf', type: 'application/pdf', size: '3.1 MB', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' }
     ],
     tasks: [
-      { id: 't2', assigneeIds: ['u1'], dueDate: '2024-03-10', instructions: 'أرشفة التقرير النهائي بعد التوقيع.', status: 'completed', createdAt: '2024-03-01' }
+      { id: 't2', issuerId: 'u1', assigneeIds: ['u1', 'u5'], dueDate: '2024-03-10', instructions: 'أرشفة التقرير النهائي بعد التوقيع.', status: 'completed', createdAt: '2024-03-01' }
     ]
   },
   {
@@ -84,7 +84,7 @@ export const MOCK_DOCUMENTS: Document[] = [
       { id: 'a4', name: 'مسودة_العقد.pdf', type: 'application/pdf', size: '1.2 MB', url: '#' }
     ],
     tasks: [
-      { id: 't3', assigneeIds: ['u1'], dueDate: '2024-05-25', instructions: 'يرجى تدقيق البند الخامس الخاص بالغرامات التأخيرية.', status: 'pending', createdAt: '2024-05-05' }
+      { id: 't3', issuerId: 'u1', assigneeIds: ['u3'], dueDate: '2024-05-25', instructions: 'يرجى تدقيق البند الخامس الخاص بالغرامات التأخيرية.', status: 'pending', createdAt: '2024-05-05' }
     ]
   }
 ];
