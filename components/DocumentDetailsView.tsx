@@ -26,18 +26,21 @@ const DownloadIconWithProgress: React.FC<{ size?: number, isDownloading: boolean
   return (
     <div className="relative flex items-center justify-center">
       {isDownloading && (
-        <svg className="absolute w-8 h-8 -rotate-90 pointer-events-none" viewBox="0 0 36 36">
-          <circle cx="18" cy="18" r="16" fill="none" className="stroke-slate-200" strokeWidth="2" />
+        <svg className="absolute w-8 h-8 -rotate-90 pointer-events-none overflow-visible" viewBox="0 0 36 36">
+          <circle cx="18" cy="18" r="17" fill="none" className="stroke-slate-100" strokeWidth="3" />
           <circle 
-            cx="18" cy="18" r="16" fill="none" 
+            cx="18" cy="18" r="17" fill="none" 
             className="stroke-emerald-500 transition-all duration-300" 
-            strokeWidth="2" 
-            strokeDasharray="100" 
-            strokeDashoffset={100 - progress}
+            strokeWidth="3" 
+            strokeDasharray="106.8" 
+            strokeDashoffset={106.8 - (progress * 1.068)}
+            strokeLinecap="round"
           />
         </svg>
       )}
-      <Download size={size} className={isDownloading ? 'text-emerald-600' : ''} />
+      <div className={`transition-all duration-300 ${isDownloading ? 'scale-75 text-emerald-600' : ''}`}>
+        {progress === 100 && isDownloading ? <Check size={size} /> : <Download size={size} />}
+      </div>
     </div>
   );
 };
@@ -70,12 +73,12 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
       setDownloadProgress(prev => {
         if (prev >= 100) {
           clearInterval(interval);
-          setTimeout(() => setDownloadingId(null), 500);
+          setTimeout(() => setDownloadingId(null), 800);
           return 100;
         }
         return prev + 10;
       });
-    }, 100);
+    }, 120);
   };
 
   const handleAddTask = () => {
@@ -293,7 +296,7 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
           </div>
         </div>
       </div>
-
+      
       {/* Direction Modal */}
       {showTaskForm && (
         <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in">

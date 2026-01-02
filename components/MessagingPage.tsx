@@ -30,6 +30,13 @@ const MessagingPage: React.FC<MessagingPageProps> = ({ documents, folders, onArc
   const [recordingTime, setRecordingTime] = useState(0);
   const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
   
+  // Multi-select state
+  const [selectedDocsForShare, setSelectedDocsForShare] = useState<Document[]>([]);
+  
+  // Download Simulation State in Preview
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recordingInterval = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -95,19 +102,33 @@ const MessagingPage: React.FC<MessagingPageProps> = ({ documents, folders, onArc
     }
   };
 
-  const shareBook = (doc: Document) => {
-    const newMsg: Message = {
-      id: Math.random().toString(36).substr(2, 9),
-      senderId: CURRENT_USER.id,
-      receiverId: selectedUserId!,
-      text: `تمت مشاركة أرشيف الكتاب: ${doc.subject}`,
-      archivedDocId: doc.id,
-      timestamp: 'الآن',
-      isRead: false
-    };
-    setMessages(prev => [...prev, newMsg]);
+  const shareSelectedBooks = () => {
+    if (selectedDocsForShare.length === 0) return;
+    
+    selectedDocsForShare.forEach(doc => {
+      const newMsg: Message = {
+        id: Math.random().toString(36).substr(2, 9),
+        senderId: CURRENT_USER.id,
+        receiverId: selectedUserId!,
+        text: `تمت مشاركة أرشيف الكتاب: ${doc.subject}`,
+        archivedDocId: doc.id,
+        timestamp: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+        isRead: false
+      };
+      setMessages(prev => [...prev, newMsg]);
+    });
+    
     setShowArchivePicker(false);
     resetPicker();
+    setSelectedDocsForShare([]);
+  };
+
+  const toggleDocSelection = (doc: Document) => {
+    setSelectedDocsForShare(prev => 
+      prev.find(d => d.id === doc.id) 
+        ? prev.filter(d => d.id !== doc.id) 
+        : [...prev, doc]
+    );
   };
 
   const resetPicker = () => {
@@ -128,6 +149,44 @@ const MessagingPage: React.FC<MessagingPageProps> = ({ documents, folders, onArc
     }
     return [];
   }, [pickerStep, pickerSearch, selectedPickerProjectId, selectedPickerFolderId, documents]);
+
+  const simulatePreviewDownload = (id: string) => {
+    setDownloadingId(id);
+    setDownloadProgress(0);
+    const interval = setInterval(() => {
+      setDownloadProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setTimeout(() => setDownloadingId(null), 800);
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 120);
+  };
+
+  const DownloadIconWithProgress: React.FC<{ size?: number, isDownloading: boolean, progress: number }> = ({ size = 18, isDownloading, progress }) => {
+    return (
+      <div className="relative flex items-center justify-center">
+        {isDownloading && (
+          <svg className="absolute w-8 h-8 -rotate-90 pointer-events-none overflow-visible" viewBox="0 0 36 36">
+            <circle cx="18" cy="18" r="17" fill="none" className="stroke-slate-100" strokeWidth="3" />
+            <circle 
+              cx="18" cy="18" r="17" fill="none" 
+              className="stroke-emerald-500 transition-all duration-300" 
+              strokeWidth="3" 
+              strokeDasharray="106.8" 
+              strokeDashoffset={106.8 - (progress * 1.068)}
+              strokeLinecap="round"
+            />
+          </svg>
+        )}
+        <div className={`transition-all duration-300 ${isDownloading ? 'scale-75 text-emerald-600' : ''}`}>
+          {progress === 100 && isDownloading ? <Check size={size} /> : <Download size={size} />}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col bg-transparent -m-8 overflow-hidden text-right" dir="rtl">
@@ -220,9 +279,9 @@ const MessagingPage: React.FC<MessagingPageProps> = ({ documents, folders, onArc
                   </div>
                 </div>
 
-                {/* ARCHIVE PICKER */}
+                {/* ARCHIVE PICKER - ENHANCED MULTI-SELECT */}
                 {showArchivePicker && (
-                  <div className="absolute bottom-full left-6 right-6 mb-4 bg-white/95 backdrop-blur-xl rounded-[2.5rem] border border-slate-200 shadow-2xl p-6 animate-in slide-in-from-bottom-4 flex flex-col max-h-[450px] z-50">
+                  <div className="absolute bottom-full left-6 right-6 mb-4 bg-white/95 backdrop-blur-xl rounded-[2.5rem] border border-slate-200 shadow-2xl p-6 animate-in slide-in-from-bottom-4 flex flex-col max-h-[480px] z-50">
                      <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
                         <div className="flex items-center gap-3">
                            {pickerStep !== 'projects' && <button onClick={() => setPickerStep(pickerStep === 'docs' ? 'folders' : 'projects')} className="p-1.5 bg-slate-50 rounded-lg hover:bg-slate-100 text-slate-400 transition-all"><ChevronRight size={16} /></button>}
@@ -240,35 +299,60 @@ const MessagingPage: React.FC<MessagingPageProps> = ({ documents, folders, onArc
                            onChange={(e) => setPickerSearch(e.target.value)}
                            className="w-full pr-10 pl-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                         />
+                        {selectedDocsForShare.length > 0 && (
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                            <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">{selectedDocsForShare.length} مختارة</span>
+                          </div>
+                        )}
                      </div>
 
-                     <div className="flex-1 overflow-y-auto custom-scrollbar px-1">
+                     <div className="flex-1 overflow-y-auto custom-scrollbar px-1 mb-4">
                         <div className={`grid ${pickerStep === 'docs' ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
-                           {pickerItems.map((item: any) => (
-                             <div 
-                                key={item.id} 
-                                onClick={() => {
-                                   if (pickerStep === 'projects') { setSelectedPickerProjectId(item.id); setPickerStep('folders'); setPickerSearch(''); }
-                                   else if (pickerStep === 'folders') { setSelectedPickerFolderId(item.id); setPickerStep('docs'); setPickerSearch(''); }
-                                   else shareBook(item);
-                                }} 
-                                className="p-4 bg-slate-50 border border-slate-100 rounded-2xl cursor-pointer hover:bg-white hover:shadow-lg hover:border-amber-200 transition-all flex items-center gap-4 group"
-                             >
-                                <div className={`p-2 rounded-xl shadow-sm ${pickerStep === 'projects' ? 'bg-white text-slate-400 group-hover:text-emerald-600' : pickerStep === 'folders' ? (item.color || 'bg-emerald-500') + ' text-white' : 'bg-white text-emerald-600'}`}>
-                                   {pickerStep === 'projects' ? <Briefcase size={20} /> : pickerStep === 'folders' ? <FolderIcon size={20} /> : <FileText size={20} />}
-                                </div>
-                                <div className="flex-1 overflow-hidden">
-                                   <p className="text-[11px] font-black text-slate-800 truncate">{pickerStep === 'docs' ? item.subject : item.name}</p>
-                                   <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
-                                      {pickerStep === 'projects' ? 'فتح المشروع' : pickerStep === 'folders' ? 'فتح الإضبارة' : 'إرسال الكتاب'}
-                                   </p>
-                                </div>
-                                {pickerStep === 'docs' && <Send size={14} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-all" />}
-                             </div>
-                           ))}
+                           {pickerItems.map((item: any) => {
+                             const isSelected = pickerStep === 'docs' && selectedDocsForShare.find(d => d.id === item.id);
+                             return (
+                               <div 
+                                  key={item.id} 
+                                  onClick={() => {
+                                     if (pickerStep === 'projects') { setSelectedPickerProjectId(item.id); setPickerStep('folders'); setPickerSearch(''); }
+                                     else if (pickerStep === 'folders') { setSelectedPickerFolderId(item.id); setPickerStep('docs'); setPickerSearch(''); }
+                                     else toggleDocSelection(item);
+                                  }} 
+                                  className={`p-4 rounded-2xl cursor-pointer transition-all flex items-center gap-4 group border ${isSelected ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-slate-50 border-slate-100 hover:bg-white hover:shadow-lg hover:border-amber-200'}`}
+                               >
+                                  <div className={`p-2 rounded-xl shadow-sm ${isSelected ? 'bg-emerald-600 text-white' : (pickerStep === 'projects' ? 'bg-white text-slate-400 group-hover:text-emerald-600' : pickerStep === 'folders' ? (item.color || 'bg-emerald-500') + ' text-white' : 'bg-white text-emerald-600')}`}>
+                                     {pickerStep === 'projects' ? <Briefcase size={20} /> : pickerStep === 'folders' ? <FolderIcon size={20} /> : <FileText size={20} />}
+                                  </div>
+                                  <div className="flex-1 overflow-hidden">
+                                     <p className="text-[11px] font-black text-slate-800 truncate">{pickerStep === 'docs' ? item.subject : item.name}</p>
+                                     <p className={`text-[8px] font-bold uppercase tracking-tighter ${isSelected ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                        {pickerStep === 'projects' ? 'فتح المشروع' : pickerStep === 'folders' ? 'فتح الإضبارة' : (isSelected ? 'تم الاختيار' : 'تحديد للإرسال')}
+                                     </p>
+                                  </div>
+                                  {pickerStep === 'docs' && (
+                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-200 group-hover:border-emerald-400'}`}>
+                                      {isSelected && <Check size={12} strokeWidth={4} />}
+                                    </div>
+                                  )}
+                               </div>
+                             );
+                           })}
                            {pickerItems.length === 0 && <div className="col-span-2 py-10 text-center text-slate-400 font-black text-[10px]">لا توجد نتائج مطابقة للبحث</div>}
                         </div>
                      </div>
+                     
+                     {/* Share Button for Multi-select */}
+                     {selectedDocsForShare.length > 0 && (
+                        <div className="pt-3 border-t border-slate-100 flex gap-3 animate-in fade-in slide-in-from-bottom-2">
+                          <button 
+                            onClick={shareSelectedBooks}
+                            className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 active:scale-95"
+                          >
+                            <Send size={16} /> إرسال الملفات المختارة ({selectedDocsForShare.length})
+                          </button>
+                          <button onClick={() => setSelectedDocsForShare([])} className="px-6 py-3 bg-slate-100 text-slate-500 rounded-xl font-black text-xs hover:bg-slate-200">إلغاء</button>
+                        </div>
+                     )}
                   </div>
                 )}
               </div>
@@ -282,58 +366,80 @@ const MessagingPage: React.FC<MessagingPageProps> = ({ documents, folders, onArc
         </div>
       </div>
 
-      {/* QUICK PREVIEW OVERLAY */}
+      {/* REFINED SLIM PREVIEW OVERLAY (NAZK STYLE) */}
       {previewDoc && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 animate-in fade-in">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in">
            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setPreviewDoc(null)}></div>
-           <div className="relative w-full max-w-2xl bg-white rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-in zoom-in-95">
-              <div className="p-6 border-b border-slate-100 flex flex-row-reverse items-center justify-between bg-white/80 backdrop-blur-md">
+           <div className="relative w-full max-w-xl bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-in zoom-in-95 max-h-[90vh]">
+              {/* Slim Header */}
+              <div className="p-4 px-8 border-b border-slate-100 flex flex-row-reverse items-center justify-between bg-white/95 backdrop-blur-md shrink-0">
                  <div className="flex flex-row-reverse items-center gap-3">
-                    <div className="p-2.5 bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-50"><ArchiveRestore size={20} /></div>
+                    <div className="p-2 bg-emerald-600 text-white rounded-xl shadow-lg"><ArchiveRestore size={18} /></div>
                     <div>
-                       <h4 className="font-black text-slate-800 text-sm">معاينة الوثيقة المشتركة</h4>
-                       <p className="text-[9px] text-slate-400 font-black uppercase">أرشيف Paperless الآمن</p>
+                       <h4 className="font-black text-slate-800 text-[13px]">معاينة الوثيقة</h4>
+                       <p className="text-[9px] text-slate-400 font-black uppercase tracking-wider">الأرشيف الذكي</p>
                     </div>
                  </div>
-                 <button onClick={() => setPreviewDoc(null)} className="p-2 hover:bg-slate-50 rounded-full text-slate-300 transition-all"><X size={24} /></button>
+                 <button onClick={() => setPreviewDoc(null)} className="p-2 hover:bg-slate-50 rounded-full text-slate-300 transition-all"><X size={22} /></button>
               </div>
 
-              <div className="p-8 space-y-8 overflow-y-auto max-h-[65vh] custom-scrollbar bg-[url('https://www.transparenttextures.com/patterns/clean-gray-paper.png')]">
-                 <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-4">
+              {/* Scrollable Content with Slim Design */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-[url('https://www.transparenttextures.com/patterns/clean-gray-paper.png')]">
+                 <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 space-y-4">
                     <div className="flex flex-row-reverse items-center justify-between">
-                       <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-lg">المرجع: {previewDoc.refNumber}</span>
-                       <span className="text-[10px] font-black text-emerald-600 flex items-center gap-1"><Clock size={12} /> {previewDoc.date}</span>
+                       <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-lg">المرجع: {previewDoc.refNumber}</span>
+                       <span className="text-[9px] font-black text-emerald-600 flex items-center gap-1"><Clock size={11} /> {previewDoc.date}</span>
                     </div>
-                    <h3 className="text-xl font-black text-slate-800 leading-snug">{previewDoc.subject}</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                       <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                          <p className="text-[9px] font-black text-slate-400 mb-1">جهة الإرسال</p>
-                          <p className="text-xs font-black text-slate-700">{previewDoc.sender}</p>
+                    <h3 className="text-base font-black text-slate-800 leading-snug">{previewDoc.subject}</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                          <p className="text-[8px] font-black text-slate-400 mb-0.5">جهة الإرسال</p>
+                          <p className="text-[11px] font-black text-slate-700 truncate">{previewDoc.sender}</p>
                        </div>
-                       <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                          <p className="text-[9px] font-black text-slate-400 mb-1">الحالة</p>
-                          <p className="text-xs font-black text-amber-600">{previewDoc.status}</p>
+                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                          <p className="text-[8px] font-black text-slate-400 mb-0.5">الحالة</p>
+                          <p className="text-[11px] font-black text-amber-600">{previewDoc.status}</p>
                        </div>
                     </div>
                  </div>
 
-                 <div className="space-y-4">
-                    <h5 className="font-black text-slate-800 text-xs flex flex-row-reverse items-center gap-2">المرفقات الرسمية ({previewDoc.attachments.length}) <PaperclipIcon size={14} className="text-emerald-500" /></h5>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                 <div className="space-y-3">
+                    <h5 className="font-black text-slate-800 text-[11px] flex flex-row-reverse items-center gap-2 pr-1">المرفقات الرسمية ({previewDoc.attachments.length}) <PaperclipIcon size={12} className="text-emerald-500" /></h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                        {previewDoc.attachments.map(file => (
-                         <div key={file.id} className="p-4 bg-white border border-slate-200 rounded-[1.5rem] flex flex-row-reverse items-center gap-4 hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group">
-                            <div className="p-2.5 bg-slate-50 text-slate-400 group-hover:bg-emerald-600 group-hover:text-white rounded-xl shadow-inner transition-all"><FileIcon size={20} /></div>
-                            <div className="flex-1 overflow-hidden text-right"><p className="text-[10px] font-black text-slate-800 truncate">{file.name}</p><p className="text-[8px] font-bold text-slate-400 uppercase">{file.size}</p></div>
-                            <Download size={16} className="text-slate-200 group-hover:text-emerald-600 transition-colors" />
+                         <div 
+                           key={file.id} 
+                           onClick={(e) => { e.stopPropagation(); simulatePreviewDownload(file.id); }}
+                           className="p-3 bg-white border border-slate-100 rounded-[1.5rem] flex flex-row-reverse items-center gap-3 hover:shadow-lg hover:border-emerald-200 transition-all cursor-pointer group relative overflow-hidden"
+                         >
+                            <div className="p-2 bg-slate-50 text-slate-400 group-hover:bg-emerald-600 group-hover:text-white rounded-xl shadow-inner transition-all"><FileIcon size={16} /></div>
+                            <div className="flex-1 overflow-hidden text-right">
+                               <p className="text-[10px] font-black text-slate-800 truncate">{file.name}</p>
+                               <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">{file.size}</p>
+                            </div>
+                            <DownloadIconWithProgress size={14} isDownloading={downloadingId === file.id} progress={downloadProgress} />
+                            
+                            {downloadingId === file.id && (
+                              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-100">
+                                <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${downloadProgress}%` }}></div>
+                              </div>
+                            )}
                          </div>
                        ))}
                     </div>
                  </div>
               </div>
 
-              <div className="p-6 bg-slate-50 border-t border-slate-100 flex flex-row-reverse gap-3">
-                 <button className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 active:scale-95"><Download size={20} /> تنزيل الكل</button>
-                 <button onClick={() => setPreviewDoc(null)} className="px-10 py-4 bg-white border border-slate-200 text-slate-500 rounded-2xl font-black">إغلاق</button>
+              {/* Slim Footer */}
+              <div className="p-4 px-8 bg-slate-50 border-t border-slate-100 flex flex-row-reverse gap-3 shrink-0">
+                 <button 
+                   onClick={() => simulatePreviewDownload('all_preview')}
+                   className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 active:scale-95"
+                 >
+                    <DownloadIconWithProgress size={16} isDownloading={downloadingId === 'all_preview'} progress={downloadProgress} />
+                    تنزيل الكل
+                 </button>
+                 <button onClick={() => setPreviewDoc(null)} className="px-8 py-3 bg-white border border-slate-200 text-slate-500 rounded-xl font-black text-xs hover:bg-slate-100">إغلاق</button>
               </div>
            </div>
         </div>
