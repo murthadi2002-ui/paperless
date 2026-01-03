@@ -13,6 +13,15 @@ export enum DocStatus {
   CLOSED = 'مغلق'
 }
 
+export interface Organization {
+  id: string;
+  name: string;
+  code: string;
+  domain?: string;
+  ownerId: string;
+  createdAt: string;
+}
+
 export interface Attachment {
   id: string;
   name: string;
@@ -28,11 +37,20 @@ export interface User {
   email: string;
   avatar: string;
   role: 'admin' | 'employee';
+  organizationId: string;
   department?: string;
+  positionId?: string;
   status?: 'active' | 'offline' | 'pending';
   permissions?: string[];
   joinedDate?: string;
   lastActive?: string;
+}
+
+export interface Position {
+  id: string;
+  name: string;
+  departmentId?: string;
+  permissions: string[];
 }
 
 export interface Department {
@@ -53,8 +71,8 @@ export interface Folder {
 
 export interface WorkflowTask {
   id: string;
-  issuerId: string; // The person who issued the direction
-  assigneeIds: string[]; // The people assigned to the direction
+  issuerId: string;
+  assigneeIds: string[];
   dueDate: string;
   instructions: string;
   status: 'pending' | 'in_progress' | 'completed' | 'overdue';

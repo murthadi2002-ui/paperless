@@ -1,5 +1,5 @@
 
-import { DocType, DocStatus, Document, Project, User, Folder, Department, Message } from './types';
+import { DocType, DocStatus, Document, Project, User, Folder, Department, Message, Position } from './types';
 
 export const MOCK_PROJECTS: Project[] = [
   { id: 'p1', name: 'مشروع برج دبي', code: 'PRJ-DB-001', description: 'تطوير البنية التحتية لبرج دبي', createdAt: '2023-11-01' },
@@ -89,6 +89,13 @@ export const MOCK_DOCUMENTS: Document[] = [
   }
 ];
 
+// Added missing MOCK_POSITIONS constant
+export const MOCK_POSITIONS: Position[] = [
+  { id: 'pos1', name: 'مدير قسم', departmentId: 'd1', permissions: ['إضافة كتاب', 'تعديل كتاب', 'حذف كتاب', 'إدارة المستخدمين'] },
+  { id: 'pos2', name: 'مهندس أول', departmentId: 'd2', permissions: ['إضافة كتاب', 'عرض الكتب فقط', 'تحميل ملفات'] },
+  { id: 'pos3', name: 'باحث قانوني', departmentId: 'd3', permissions: ['إضافة كتاب', 'تعديل كتاب'] },
+];
+
 export const MOCK_EMPLOYEES: User[] = [
   {
     id: 'u2',
@@ -96,6 +103,8 @@ export const MOCK_EMPLOYEES: User[] = [
     email: 'sara.k@paperless.com',
     avatar: 'https://i.pravatar.cc/150?u=sara',
     role: 'employee',
+    // Added missing organizationId
+    organizationId: 'org-1',
     department: 'الهندسة المعمارية',
     status: 'active',
     joinedDate: '2023-05-12',
@@ -108,6 +117,8 @@ export const MOCK_EMPLOYEES: User[] = [
     email: 'm.ali@paperless.com',
     avatar: 'https://i.pravatar.cc/150?u=mohammed',
     role: 'employee',
+    // Added missing organizationId
+    organizationId: 'org-1',
     department: 'الإدارة القانونية',
     status: 'offline',
     joinedDate: '2023-01-20',
@@ -120,6 +131,8 @@ export const MOCK_EMPLOYEES: User[] = [
     email: 'laila.m@paperless.com',
     avatar: 'https://i.pravatar.cc/150?u=laila',
     role: 'employee',
+    // Added missing organizationId
+    organizationId: 'org-1',
     department: 'الموارد البشرية',
     status: 'active',
     joinedDate: '2023-11-05',
@@ -132,6 +145,8 @@ export const MOCK_EMPLOYEES: User[] = [
     email: 'yasin.f@paperless.com',
     avatar: 'https://i.pravatar.cc/150?u=yasin',
     role: 'employee',
+    // Added missing organizationId
+    organizationId: 'org-1',
     department: 'الإدارة العامة',
     status: 'pending',
     joinedDate: '2024-03-01',
@@ -144,6 +159,8 @@ export const MOCK_EMPLOYEES: User[] = [
     email: 'nora.h@paperless.com',
     avatar: 'https://i.pravatar.cc/150?u=nora',
     role: 'employee',
+    // Added missing organizationId
+    organizationId: 'org-1',
     department: 'إدارة المشاريع',
     status: 'active',
     joinedDate: '2023-08-15',
@@ -158,6 +175,8 @@ export const CURRENT_USER: User = {
   email: 'admin@paperless.com',
   avatar: 'https://i.pravatar.cc/150?u=admin',
   role: 'admin',
+  // Added missing organizationId
+  organizationId: 'org-1',
   department: 'الإدارة العامة'
 };
 

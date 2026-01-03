@@ -18,10 +18,10 @@ const Dashboard: React.FC<DashboardProps> = ({ documents, onOpenDoc }) => {
   const taskedDocs = documents.filter(d => d.tasks?.some(t => t.status !== 'completed'));
 
   const stats = [
-    { label: 'الكتب الواردة', value: incomingCount, icon: FileDown, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'الكتب الواردة', value: incomingCount, icon: FileDown, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     { label: 'الكتب الصادرة', value: outgoingCount, icon: FileUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     { label: 'قيد المتابعة', value: inProgressCount, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
-    { label: 'مكتملة الأرشفة', value: closedCount, icon: CheckCircle2, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { label: 'مكتملة الأرشفة', value: closedCount, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
   ];
 
   return (
@@ -61,7 +61,7 @@ const Dashboard: React.FC<DashboardProps> = ({ documents, onOpenDoc }) => {
         })}
       </div>
 
-      {/* Workflow Section - Redesigned with Full Identity Capsules */}
+      {/* Workflow Section */}
       {taskedDocs.length > 0 && (
         <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-6 px-10 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -81,27 +81,21 @@ const Dashboard: React.FC<DashboardProps> = ({ documents, onOpenDoc }) => {
 
                return (
                  <div key={doc.id} onClick={() => onOpenDoc?.(doc)} className="bg-white p-6 rounded-[2.8rem] border border-slate-100 hover:shadow-2xl hover:border-emerald-200 transition-all cursor-pointer group flex flex-col h-full shadow-sm relative">
-                    {/* Full Identity Flow with Names */}
                     <div className="flex flex-col gap-3.5 mb-6 bg-slate-50/80 p-5 rounded-[2rem] border border-slate-100/50">
-                      {/* Full Issuer Pill (Name + Photo) */}
-                      <div className="flex items-center self-start gap-3 bg-white px-4 py-2.5 rounded-full border border-indigo-100 shadow-sm transition-transform group-hover:scale-105 ring-2 ring-indigo-50/20">
-                        <span className="text-[8px] font-black text-indigo-400 uppercase">مِن:</span>
+                      <div className="flex items-center self-start gap-3 bg-white px-4 py-2.5 rounded-full border border-emerald-100 shadow-sm transition-transform group-hover:scale-105 ring-2 ring-emerald-50/20">
+                        <span className="text-[8px] font-black text-emerald-400 uppercase">مِن:</span>
                         <img src={issuer?.avatar} className="w-6 h-6 rounded-full object-cover border-2 border-white shadow-sm" alt="" />
-                        <span className="text-[10px] font-black text-indigo-700 truncate max-w-[120px]">{issuer?.name}</span>
+                        <span className="text-[10px] font-black text-emerald-700 truncate max-w-[120px]">{issuer?.name}</span>
                       </div>
                       
                       <div className="pr-6 py-0.5 text-slate-200"><ArrowLeft size={16} strokeWidth={3} /></div>
 
-                      {/* Full Assignees Pill */}
                       <div className="flex items-center self-end gap-3 bg-white px-4 py-2.5 rounded-full border border-amber-100 shadow-sm transition-transform group-hover:scale-105">
                         <span className="text-[8px] font-black text-amber-400 uppercase ml-1">إلى:</span>
                         <div className="flex -space-x-1.5 flex-row-reverse">
                           {assignees.slice(0, 2).map(a => (
                             <img key={a.id} src={a.avatar} className="w-6 h-6 rounded-full object-cover border-2 border-white shadow-sm" title={a.name} alt="" />
                           ))}
-                          {assignees.length > 2 && (
-                            <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black flex items-center justify-center border-2 border-white">+{assignees.length - 2}</div>
-                          )}
                         </div>
                         <span className="text-[10px] font-black text-amber-700">{assignees.length === 1 ? assignees[0].name.split(' ')[0] : 'المكلفون'}</span>
                       </div>
@@ -135,7 +129,7 @@ const Dashboard: React.FC<DashboardProps> = ({ documents, onOpenDoc }) => {
           <div className="divide-y divide-slate-50">
             {documents.slice(0, 5).map((doc) => (
               <div key={doc.id} onClick={() => onOpenDoc?.(doc)} className="p-6 px-10 hover:bg-slate-50 transition-colors flex items-center gap-6 cursor-pointer group">
-                <div className={`p-4 rounded-2xl transition-transform group-hover:rotate-12 ${doc.type === DocType.INCOMING ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                <div className={`p-4 rounded-2xl transition-transform group-hover:rotate-12 ${doc.type === DocType.INCOMING ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-50 text-emerald-600'}`}>
                   {doc.type === DocType.INCOMING ? <FileDown size={20} /> : <FileUp size={20} />}
                 </div>
                 <div className="flex-1 overflow-hidden">
@@ -166,7 +160,7 @@ const Dashboard: React.FC<DashboardProps> = ({ documents, onOpenDoc }) => {
           <div className="space-y-6">
             {[
               { user: 'سارة خالد', action: 'اعتمدت الإجراء على التوجيه الوارد', time: '10 د', icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-              { user: 'محمد علي', action: 'قام بإغلاق أرشيف الكتاب #552', time: '1 س', icon: CheckCircle2, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+              { user: 'محمد علي', action: 'قام بإغلاق أرشيف الكتاب #552', time: '1 س', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
               { user: 'أحمد محمد', action: 'وجه خطاباً إدارياً جديداً للمكتب الفني', time: '3 س', icon: SendHorizontal, color: 'text-amber-600', bg: 'bg-amber-50' },
             ].map((activity, idx) => {
               const Icon = activity.icon;

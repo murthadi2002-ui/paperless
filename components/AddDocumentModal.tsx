@@ -70,13 +70,15 @@ const AddDocumentModal: React.FC<AddDocumentModalProps> = ({ isOpen, onClose, on
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid) return;
+    // Add missing tasks property to satisfy the Document interface
     const newDoc: Document = {
       id: Math.random().toString(36).substr(2, 9),
       ...formData,
       folderId: formData.folderId || undefined,
       status: DocStatus.NEW,
       attachments: uploadedFiles,
-      tags: formData.tags.length > 0 ? formData.tags : ['مؤرشف']
+      tags: formData.tags.length > 0 ? formData.tags : ['مؤرشف'],
+      tasks: []
     };
     onAdd(newDoc);
     resetForm();
