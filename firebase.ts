@@ -9,12 +9,13 @@ import { getFirestore } from "firebase/firestore";
  * 3. استبدل القيم أدناه بالقيم الحقيقية التي حصلت عليها.
  */
 const firebaseConfig = {
-  apiKey: "استبدل_هذا_بـ_API_KEY",
-  authDomain: "استبدل_هذا_بـ_AUTH_DOMAIN",
-  projectId: "استبدل_هذا_بـ_PROJECT_ID",
-  storageBucket: "استبدل_هذا_بـ_STORAGE_BUCKET",
-  messagingSenderId: "استبدل_هذا_بـ_SENDER_ID",
-  appId: "استبدل_هذا_بـ_APP_ID"
+  apiKey: "AIzaSyCq8TVGkTVCMTa4o9AM3x9LhLWqWEwMWUw",
+  authDomain: "paperless-12a1b.firebaseapp.com",
+  projectId: "paperless-12a1b",
+  storageBucket: "paperless-12a1b.firebasestorage.app",
+  messagingSenderId: "328469333876",
+  appId: "1:328469333876:web:8d24faf089b0b837fb8e21",
+  measurementId: "G-2TH70QV2KR"
 };
 
 // تهيئة التطبيق
