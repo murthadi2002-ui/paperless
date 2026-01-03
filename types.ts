@@ -113,7 +113,8 @@ export interface Message {
   senderId: string;
   receiverId: string;
   text?: string;
-  timestamp: string;
+  // Changed from string to any to support both Firestore Timestamp objects and mock strings
+  timestamp: any;
   attachment?: Attachment;
   archivedDocId?: string;
   isVoice?: boolean;

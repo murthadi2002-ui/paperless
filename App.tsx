@@ -1,5 +1,12 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
+import { 
+  collection, onSnapshot, addDoc, updateDoc, 
+  deleteDoc, doc, query, orderBy, where, 
+  setDoc, getDoc, serverTimestamp 
+} from 'firebase/firestore';
+import { db } from './firebase';
+
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import DocumentList from './components/DocumentList';
@@ -14,11 +21,11 @@ import MessagingPage from './components/MessagingPage';
 import EmployeePortal from './components/EmployeePortal';
 import ConfirmModal from './components/ConfirmModal';
 import AuthPage from './components/AuthPage';
-import { MOCK_DOCUMENTS, MOCK_FOLDERS, MOCK_PROJECTS, MOCK_DEPARTMENTS, MOCK_EMPLOYEES, MOCK_POSITIONS, CURRENT_USER } from './constants';
-import { Document, Folder, Attachment, Project, Department, User, Organization, Position, WorkflowTask, DocStatus } from './types';
+
+import { CURRENT_USER } from './constants';
+import { Document, Folder, Project, Department, User, Organization, Position, WorkflowTask, DocStatus } from './types';
 
 const App: React.FC = () => {
-  // Auth State - Bypassed for now as requested
   const [currentUser, setCurrentUser] = useState<User | null>(CURRENT_USER);
   const [currentOrg, setCurrentOrg] = useState<Organization | null>({
     id: 'org-1',
@@ -36,69 +43,121 @@ const App: React.FC = () => {
   const [userRoleView, setUserRoleView] = useState<'admin' | 'employee'>('admin'); 
   
   const [autoOpenFiles, setAutoOpenFiles] = useState(true);
-  const [documents, setDocuments] = useState<Document[]>(MOCK_DOCUMENTS);
-  const [folders, setFolders] = useState<Folder[]>(MOCK_FOLDERS);
-  const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS);
-  const [departments, setDepartments] = useState<Department[]>(MOCK_DEPARTMENTS);
-  const [employees, setEmployees] = useState<User[]>(MOCK_EMPLOYEES);
-  const [positions, setPositions] = useState<Position[]>(MOCK_POSITIONS);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [employees, setEmployees] = useState<User[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
   
   const [currentDocument, setCurrentDocument] = useState<Document | null>(null);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
-
-  // Deletion State
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'doc' | 'folder' | 'attachment' | 'project', parentId?: string } | null>(null);
+
+  // --- Real-time Firestore Listeners ---
+  useEffect(() => {
+    if (!currentOrg) return;
+
+    const unsubDocs = onSnapshot(query(collection(db, "documents"), orderBy("date", "desc")), (snapshot) => {
+      setDocuments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Document)));
+    });
+
+    const unsubFolders = onSnapshot(collection(db, "folders"), (snapshot) => {
+      setFolders(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Folder)));
+    });
+
+    const unsubProjects = onSnapshot(collection(db, "projects"), (snapshot) => {
+      setProjects(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Project)));
+    });
+
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+      setEmployees(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as User)));
+    });
+
+    const unsubDepts = onSnapshot(collection(db, "departments"), (snapshot) => {
+      setDepartments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Department)));
+    });
+
+    const unsubPos = onSnapshot(collection(db, "positions"), (snapshot) => {
+      setPositions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Position)));
+    });
+
+    return () => {
+      unsubDocs(); unsubFolders(); unsubProjects(); unsubUsers(); unsubDepts(); unsubPos();
+    };
+  }, [currentOrg]);
+
+  // --- Firestore Handlers ---
+  const handleAddDocument = async (newDoc: any) => {
+    const { id, ...docData } = newDoc;
+    await addDoc(collection(db, "documents"), { ...docData, createdAt: serverTimestamp() });
+  };
+
+  const handleAddFolder = async (folder: any) => {
+    const { id, ...data } = folder;
+    await addDoc(collection(db, "folders"), { ...data, createdAt: serverTimestamp() });
+  };
+
+  const handleAddProject = async (project: any) => {
+    const { id, ...data } = project;
+    await addDoc(collection(db, "projects"), { ...data, createdAt: serverTimestamp() });
+  };
+
+  const handleInviteEmployee = async (user: User) => {
+    const { id, ...data } = user;
+    await setDoc(doc(db, "users", id), { ...data, createdAt: serverTimestamp() });
+  };
+
+  const handleUpdateEmployee = async (userId: string, updates: Partial<User>) => {
+    await updateDoc(doc(db, "users", userId), updates);
+  };
+
+  const handleAddDept = async (name: string) => {
+    await addDoc(collection(db, "departments"), { name, employeeCount: 0 });
+  };
+
+  const handleAddTask = async (docId: string, task: WorkflowTask) => {
+    const document = documents.find(d => d.id === docId);
+    if (document) {
+      await updateDoc(doc(db, "documents", docId), {
+        tasks: [...(document.tasks || []), task],
+        status: DocStatus.IN_PROGRESS
+      });
+    }
+  };
+
+  const handleUpdateSubject = async (docId: string, newSubject: string) => {
+    await updateDoc(doc(db, "documents", docId), { subject: newSubject });
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDelete) return;
+    try {
+      if (confirmDelete.type === 'doc') {
+        await updateDoc(doc(db, "documents", confirmDelete.id), { deletedAt: new Date().toISOString() });
+        setActiveView('list');
+      } else if (confirmDelete.type === 'folder') {
+        await updateDoc(doc(db, "folders", confirmDelete.id), { deletedAt: new Date().toISOString() });
+      } else if (confirmDelete.type === 'project') {
+        await deleteDoc(doc(db, "projects", confirmDelete.id));
+        setActiveProjectView('list');
+      } else if (confirmDelete.type === 'attachment' && confirmDelete.parentId) {
+        const docRef = doc(db, "documents", confirmDelete.parentId);
+        const document = documents.find(d => d.id === confirmDelete.parentId);
+        if (document) {
+          await updateDoc(docRef, {
+            attachments: document.attachments.filter(a => a.id !== confirmDelete.id)
+          });
+        }
+      }
+    } catch (e) { console.error("Error:", e); }
+    setConfirmDelete(null);
+  };
 
   const handleLogin = (user: User, org: Organization) => {
     setCurrentUser(user);
     setCurrentOrg(org);
     setUserRoleView(user.role);
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setCurrentOrg(null);
-  };
-
-  // Fixed handleAddDocument to directly use the document object as it's now correctly formed in AddDocumentModal
-  const handleAddDocument = (newDoc: Document) => setDocuments([newDoc, ...documents]);
-
-  const handleOpenUnit = (doc: Document) => {
-    setCurrentDocument(doc);
-    setActiveView('details');
-  };
-
-  const handleAddTask = (docId: string, task: WorkflowTask) => {
-    setDocuments(prev => prev.map(d => 
-      d.id === docId ? { ...d, tasks: [...(d.tasks || []), task], status: DocStatus.IN_PROGRESS } : d
-    ));
-    if (currentDocument?.id === docId) {
-      setCurrentDocument(prev => prev ? { ...prev, tasks: [...(prev.tasks || []), task], status: DocStatus.IN_PROGRESS } : null);
-    }
-  };
-
-  const executeDelete = () => {
-    if (!confirmDelete) return;
-    if (confirmDelete.type === 'doc') {
-      setDocuments(prev => prev.map(d => d.id === confirmDelete.id ? { ...d, deletedAt: new Date().toISOString() } : d));
-      setActiveView('list');
-    } else if (confirmDelete.type === 'folder') {
-      setFolders(prev => prev.map(f => f.id === confirmDelete.id ? { ...f, deletedAt: new Date().toISOString() } : f));
-    } else if (confirmDelete.type === 'attachment' && confirmDelete.parentId) {
-      const updatedDocs = documents.map(d => 
-        d.id === confirmDelete.parentId 
-        ? { ...d, attachments: d.attachments.filter(at => at.id !== confirmDelete.id) } 
-        : d
-      );
-      setDocuments(updatedDocs);
-      if (currentDocument?.id === confirmDelete.parentId) {
-        setCurrentDocument(prev => prev ? { ...prev, attachments: prev.attachments.filter(at => at.id !== confirmDelete.id) } : null);
-      }
-    } else if (confirmDelete.type === 'project') {
-      setProjects(prev => prev.filter(p => p.id !== confirmDelete.id));
-      setActiveProjectView('list');
-    }
-    setConfirmDelete(null);
   };
 
   const renderContent = () => {
@@ -108,37 +167,41 @@ const App: React.FC = () => {
     const deletedFolders = folders.filter(f => !!f.deletedAt);
 
     if (activeView === 'details' && currentDocument) {
+      const liveDoc = documents.find(d => d.id === currentDocument.id) || currentDocument;
       return (
         <DocumentDetailsView 
-          doc={currentDocument} 
+          doc={liveDoc} 
           autoOpenFiles={autoOpenFiles}
           onBack={() => { setActiveView('list'); setCurrentDocument(null); }} 
-          onDelete={() => setConfirmDelete({ id: currentDocument.id, type: 'doc' })}
-          onUpdateSubject={(newSub) => setDocuments(prev => prev.map(d => d.id === currentDocument.id ? { ...d, subject: newSub } : d))}
-          onAddAttachment={(at) => setDocuments(prev => prev.map(d => d.id === currentDocument.id ? { ...d, attachments: [...d.attachments, at] } : d))}
-          onDeleteAttachment={(atId) => setConfirmDelete({ id: atId, type: 'attachment', parentId: currentDocument.id })}
+          onDelete={() => setConfirmDelete({ id: liveDoc.id, type: 'doc' })}
+          onUpdateSubject={(sub) => handleUpdateSubject(liveDoc.id, sub)}
+          onAddAttachment={async (at) => await updateDoc(doc(db, "documents", liveDoc.id), { attachments: [...liveDoc.attachments, at] })}
+          onDeleteAttachment={(atId) => setConfirmDelete({ id: atId, type: 'attachment', parentId: liveDoc.id })}
           onAddTask={handleAddTask}
         />
       );
     }
 
     switch (activeTab) {
-      case 'dashboard': return <Dashboard documents={activeDocs} onOpenDoc={handleOpenUnit} />;
+      case 'dashboard': return <Dashboard documents={activeDocs} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
       case 'documents': 
         return (
           <DocumentList 
             documents={activeDocs} folders={activeFolders} projects={projects}
-            onAddFolder={(f) => setFolders([...folders, f])} 
-            onOpenUnit={handleOpenUnit}
+            onAddFolder={handleAddFolder} 
+            onOpenUnit={(d) => { setCurrentDocument(d); setActiveView('details'); }}
             onDeleteDoc={(id) => setConfirmDelete({ id, type: 'doc' })}
             onDeleteFolder={(id) => setConfirmDelete({ id, type: 'folder' })}
-            onTogglePin={(id) => setDocuments(prev => prev.map(d => d.id === id ? { ...d, isPinned: !d.isPinned } : d))}
+            onTogglePin={async (id) => {
+              const d = documents.find(doc => doc.id === id);
+              if(d) await updateDoc(doc(db, "documents", id), { isPinned: !d.isPinned });
+            }}
           />
         );
-      case 'my-tasks': return <EmployeePortal documents={activeDocs} onOpenDoc={handleOpenUnit} />;
+      case 'my-tasks': return <EmployeePortal documents={activeDocs} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
       case 'messages': return <MessagingPage documents={activeDocs} folders={activeFolders} onArchiveFile={()=>{}} />;
       case 'projects':
-        if (activeProjectView === 'details' && currentProject) return <ProjectDetailsView project={currentProject} documents={activeDocs} folders={activeFolders} onBack={()=>{setActiveProjectView('list');setCurrentProject(null)}} onOpenDoc={handleOpenUnit} />;
+        if (activeProjectView === 'details' && currentProject) return <ProjectDetailsView project={currentProject} documents={activeDocs} folders={activeFolders} onBack={()=>{setActiveProjectView('list');setCurrentProject(null)}} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
         return (
           <ProjectList 
             projects={projects} documents={activeDocs} 
@@ -147,52 +210,58 @@ const App: React.FC = () => {
             onDeleteProject={(id) => setConfirmDelete({ id, type: 'project' })}
           />
         );
-      case 'invites': return <InviteManagement departments={departments} employees={employees} setEmployees={setEmployees} positions={positions} />;
+      case 'invites': 
+        return (
+          <InviteManagement 
+            departments={departments} employees={employees} 
+            onInvite={handleInviteEmployee} 
+            onUpdateEmployee={handleUpdateEmployee}
+            positions={positions} 
+          />
+        );
       case 'settings': 
         return (
           <SettingsPage 
             deletedDocs={deletedDocs} deletedFolders={deletedFolders} 
             autoOpenFiles={autoOpenFiles} setAutoOpenFiles={setAutoOpenFiles} 
-            onRestoreDoc={(doc)=>setDocuments(documents.map(d=>d.id===doc.id?{...d,deletedAt:null}:d))} 
-            onRestoreFolder={(f)=>setFolders(folders.map(fo=>fo.id===f.id?{...fo,deletedAt:null}:fo))} 
-            departments={departments} setDepartments={setDepartments}
-            onDeleteDepartment={(id)=>setDepartments(departments.filter(d=>d.id!==id))} 
+            onRestoreDoc={async (docObj)=> await updateDoc(doc(db, "documents", docObj.id), { deletedAt: null })} 
+            onRestoreFolder={async (fObj)=> await updateDoc(doc(db, "folders", fObj.id), { deletedAt: null })} 
+            departments={departments} 
+            onAddDept={handleAddDept}
+            onDeleteDepartment={async (id)=> await deleteDoc(doc(db, "departments", id))} 
           />
         );
-      default: return <Dashboard documents={activeDocs} onOpenDoc={handleOpenUnit} />;
+      default: return <Dashboard documents={activeDocs} />;
     }
   };
 
-  // If not logged in, show Auth Page
-  if (!currentUser || !currentOrg) {
-    return <AuthPage onLogin={handleLogin} />;
-  }
+  if (!currentUser || !currentOrg) return <AuthPage onLogin={handleLogin} />;
 
   return (
     <Layout 
       activeTab={activeTab} 
       setActiveTab={(t)=>{setActiveTab(t);setActiveView('list');setActiveProjectView('list')}} 
       onAddClick={()=>setIsAddModalOpen(true)}
-      onLogout={handleLogout}
+      onLogout={() => { setCurrentUser(null); setCurrentOrg(null); }}
       organizationName={currentOrg.name}
     >
       <div className="fixed bottom-6 left-6 z-[100] flex gap-2">
          <button onClick={() => setUserRoleView(userRoleView === 'admin' ? 'employee' : 'admin')} className="bg-slate-800 text-white px-4 py-2 rounded-full text-[10px] font-black shadow-2xl hover:bg-slate-700 transition-all border border-slate-600">
-           تبديل البوابة: {userRoleView === 'admin' ? 'المدير' : 'الموظف'}
+           البوابة الحالية: {userRoleView === 'admin' ? 'المدير' : 'الموظف'}
          </button>
       </div>
 
       {userRoleView === 'employee' && activeTab === 'dashboard' ? (
-        <EmployeePortal documents={documents} onOpenDoc={handleOpenUnit} />
+        <EmployeePortal documents={documents} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />
       ) : renderContent()}
 
       <AddDocumentModal isOpen={isAddModalOpen} onClose={()=>setIsAddModalOpen(false)} onAdd={handleAddDocument} folders={folders} />
-      <CreateProjectModal isOpen={isAddProjectModalOpen} onClose={()=>setIsAddProjectModalOpen(false)} onSave={(p)=>setProjects([...projects,p])} />
+      <CreateProjectModal isOpen={isAddProjectModalOpen} onClose={()=>setIsAddProjectModalOpen(false)} onSave={handleAddProject} />
 
       <ConfirmModal 
         isOpen={!!confirmDelete} 
         title={confirmDelete?.type === 'doc' ? 'حذف الوثيقة' : confirmDelete?.type === 'folder' ? 'حذف الأضبارة' : 'حذف'}
-        message="هل أنت متأكد من هذا الإجراء؟ سيتم نقل العنصر لسلة المهملات."
+        message="هل أنت متأكد؟ سيتم نقل العنصر لسلة المهملات."
         confirmLabel="نعم، حذف" cancelLabel="إلغاء"
         onConfirm={executeDelete} onCancel={() => setConfirmDelete(null)}
       />
