@@ -41,6 +41,7 @@ const App: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
   const [userRoleView, setUserRoleView] = useState<'admin' | 'employee'>('admin'); 
+  const [dbError, setDbError] = useState<string | null>(null);
   
   const [autoOpenFiles, setAutoOpenFiles] = useState(true);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -54,33 +55,46 @@ const App: React.FC = () => {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'doc' | 'folder' | 'attachment' | 'project', parentId?: string } | null>(null);
 
-  // --- Real-time Firestore Listeners ---
+  // --- Real-time Firestore Listeners with Error Handling ---
   useEffect(() => {
     if (!currentOrg) return;
 
-    const unsubDocs = onSnapshot(query(collection(db, "documents"), orderBy("date", "desc")), (snapshot) => {
-      setDocuments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Document)));
-    });
+    const handleError = (err: any) => {
+      console.error("Firestore Error:", err);
+      if (err.code === 'permission-denied') {
+        setDbError("يجب تفعيل Security Rules من لوحة تحكم Firebase (Rules > allow read, write: if true)");
+      }
+    };
 
-    const unsubFolders = onSnapshot(collection(db, "folders"), (snapshot) => {
-      setFolders(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Folder)));
-    });
+    const unsubDocs = onSnapshot(query(collection(db, "documents"), orderBy("date", "desc")), 
+      (snapshot) => { setDocuments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Document))); setDbError(null); },
+      handleError
+    );
 
-    const unsubProjects = onSnapshot(collection(db, "projects"), (snapshot) => {
-      setProjects(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Project)));
-    });
+    const unsubFolders = onSnapshot(collection(db, "folders"), 
+      (snapshot) => setFolders(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Folder))),
+      handleError
+    );
 
-    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
-      setEmployees(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as User)));
-    });
+    const unsubProjects = onSnapshot(collection(db, "projects"), 
+      (snapshot) => setProjects(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Project))),
+      handleError
+    );
 
-    const unsubDepts = onSnapshot(collection(db, "departments"), (snapshot) => {
-      setDepartments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Department)));
-    });
+    const unsubUsers = onSnapshot(collection(db, "users"), 
+      (snapshot) => setEmployees(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as User))),
+      handleError
+    );
 
-    const unsubPos = onSnapshot(collection(db, "positions"), (snapshot) => {
-      setPositions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Position)));
-    });
+    const unsubDepts = onSnapshot(collection(db, "departments"), 
+      (snapshot) => setDepartments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Department))),
+      handleError
+    );
+
+    const unsubPos = onSnapshot(collection(db, "positions"), 
+      (snapshot) => setPositions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Position))),
+      handleError
+    );
 
     return () => {
       unsubDocs(); unsubFolders(); unsubProjects(); unsubUsers(); unsubDepts(); unsubPos();
@@ -90,17 +104,21 @@ const App: React.FC = () => {
   // --- Firestore Handlers ---
   const handleAddDocument = async (newDoc: any) => {
     const { id, ...docData } = newDoc;
-    await addDoc(collection(db, "documents"), { ...docData, createdAt: serverTimestamp() });
+    // تنظيف البيانات من أي قيم undefined قبل الإرسال لـ Firebase
+    const cleanData = JSON.parse(JSON.stringify(docData));
+    await addDoc(collection(db, "documents"), { ...cleanData, createdAt: serverTimestamp() });
   };
 
   const handleAddFolder = async (folder: any) => {
     const { id, ...data } = folder;
-    await addDoc(collection(db, "folders"), { ...data, createdAt: serverTimestamp() });
+    const cleanData = JSON.parse(JSON.stringify(data));
+    await addDoc(collection(db, "folders"), { ...cleanData, createdAt: serverTimestamp() });
   };
 
   const handleAddProject = async (project: any) => {
     const { id, ...data } = project;
-    await addDoc(collection(db, "projects"), { ...data, createdAt: serverTimestamp() });
+    const cleanData = JSON.parse(JSON.stringify(data));
+    await addDoc(collection(db, "projects"), { ...cleanData, createdAt: serverTimestamp() });
   };
 
   const handleInviteEmployee = async (user: User) => {
@@ -245,6 +263,17 @@ const App: React.FC = () => {
       onLogout={() => { setCurrentUser(null); setCurrentOrg(null); }}
       organizationName={currentOrg.name}
     >
+      {/* DB Connection Error Bar */}
+      {dbError && (
+        <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-2xl flex items-center justify-between animate-pulse">
+           <div className="flex items-center gap-3">
+             <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+             <p className="text-[11px] font-black text-red-700">{dbError}</p>
+           </div>
+           <button onClick={() => window.location.reload()} className="text-[10px] font-black text-red-800 underline">تحديث الصفحة</button>
+        </div>
+      )}
+
       <div className="fixed bottom-6 left-6 z-[100] flex gap-2">
          <button onClick={() => setUserRoleView(userRoleView === 'admin' ? 'employee' : 'admin')} className="bg-slate-800 text-white px-4 py-2 rounded-full text-[10px] font-black shadow-2xl hover:bg-slate-700 transition-all border border-slate-600">
            البوابة الحالية: {userRoleView === 'admin' ? 'المدير' : 'الموظف'}
@@ -255,7 +284,13 @@ const App: React.FC = () => {
         <EmployeePortal documents={documents} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />
       ) : renderContent()}
 
-      <AddDocumentModal isOpen={isAddModalOpen} onClose={()=>setIsAddModalOpen(false)} onAdd={handleAddDocument} folders={folders} />
+      <AddDocumentModal 
+        isOpen={isAddModalOpen} 
+        onClose={()=>setIsAddModalOpen(false)} 
+        onAdd={handleAddDocument} 
+        folders={folders} 
+        projects={projects}
+      />
       <CreateProjectModal isOpen={isAddProjectModalOpen} onClose={()=>setIsAddProjectModalOpen(false)} onSave={handleAddProject} />
 
       <ConfirmModal 

@@ -1,16 +1,17 @@
 
 import React, { useState, useRef } from 'react';
-import { X, Upload, FileText, Save, Trash2, AlertCircle } from 'lucide-react';
-import { DocType, DocStatus, Document, Folder, Attachment } from '../types';
+import { X, Upload, FileText, Save, Trash2, AlertCircle, Briefcase, Folder as FolderIcon } from 'lucide-react';
+import { DocType, DocStatus, Document, Folder, Attachment, Project } from '../types';
 
 interface AddDocumentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAdd: (doc: Document) => void;
   folders: Folder[];
+  projects: Project[];
 }
 
-const AddDocumentModal: React.FC<AddDocumentModalProps> = ({ isOpen, onClose, onAdd, folders }) => {
+const AddDocumentModal: React.FC<AddDocumentModalProps> = ({ isOpen, onClose, onAdd, folders, projects }) => {
   const [processing, setProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -70,17 +71,28 @@ const AddDocumentModal: React.FC<AddDocumentModalProps> = ({ isOpen, onClose, on
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid) return;
-    // Add missing tasks property to satisfy the Document interface
-    const newDoc: Document = {
-      id: Math.random().toString(36).substr(2, 9),
-      ...formData,
-      folderId: formData.folderId || undefined,
+
+    // بناء كائن الوثيقة مع تجنب إرسال قيم فارغة كـ undefined لـ Firebase
+    const newDoc: any = {
+      type: formData.type,
+      refNumber: formData.refNumber,
+      date: formData.date,
+      sender: formData.sender,
+      receiver: formData.receiver,
+      subject: formData.subject,
+      department: formData.department,
+      notes: formData.notes,
       status: DocStatus.NEW,
       attachments: uploadedFiles,
       tags: formData.tags.length > 0 ? formData.tags : ['مؤرشف'],
       tasks: []
     };
-    onAdd(newDoc);
+
+    // إضافة المعرفات فقط إذا كانت مختارة
+    if (formData.folderId) newDoc.folderId = formData.folderId;
+    if (formData.projectId) newDoc.projectId = formData.projectId;
+
+    onAdd(newDoc as Document);
     resetForm();
     onClose();
   };
@@ -97,7 +109,7 @@ const AddDocumentModal: React.FC<AddDocumentModalProps> = ({ isOpen, onClose, on
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="bg-white w-full max-w-5xl max-h-[90vh] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
-        {/* Header - Slimmed down */}
+        {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-md">
@@ -138,6 +150,24 @@ const AddDocumentModal: React.FC<AddDocumentModalProps> = ({ isOpen, onClose, on
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-1">الجهة المستلمة</label>
                   <input type="text" className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 outline-none transition-all font-bold text-sm" value={formData.receiver} onChange={e => setFormData({...formData, receiver: e.target.value})} />
                 </div>
+              </div>
+            </div>
+
+            {/* حقول التصنيف: المشروع والإضبارة */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-1 flex items-center gap-1"><Briefcase size={12}/> المشروع المرتبط</label>
+                <select className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-sm" value={formData.projectId} onChange={e => setFormData({...formData, projectId: e.target.value})}>
+                  <option value="">عام (بدون مشروع)</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-1 flex items-center gap-1"><FolderIcon size={12}/> الإضبارة (Folder)</label>
+                <select className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-sm" value={formData.folderId} onChange={e => setFormData({...formData, folderId: e.target.value})}>
+                  <option value="">بدون إضبارة</option>
+                  {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
               </div>
             </div>
             
@@ -187,7 +217,7 @@ const AddDocumentModal: React.FC<AddDocumentModalProps> = ({ isOpen, onClose, on
           </div>
         </form>
 
-        {/* Footer - Slimmed down */}
+        {/* Footer */}
         <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between shrink-0">
           <div className="flex-1 flex items-center">
             {!isFormValid ? (
