@@ -5,13 +5,13 @@ import { AlertCircle, CheckCircle2, X, ShieldAlert } from 'lucide-react';
 interface ConfirmModalProps {
   isOpen: boolean;
   title: string;
-  message: string;
+  message: React.ReactNode; // تم التغيير من string إلى ReactNode
   confirmLabel: string;
   cancelLabel: string;
   onConfirm: () => void;
   onCancel: () => void;
   type?: 'danger' | 'success';
-  requireTextConfirmation?: boolean; // تفعيل الكتابة للتأكيد
+  requireTextConfirmation?: boolean;
 }
 
 const ConfirmModal: React.FC<ConfirmModalProps> = ({ 
@@ -39,7 +39,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
       <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
         <div className="p-8 text-center">
           <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-6 ${
@@ -48,7 +48,11 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
             {requireTextConfirmation ? <ShieldAlert size={32} /> : (type === 'danger' ? <AlertCircle size={32} /> : <CheckCircle2 size={32} />)}
           </div>
           <h3 className="text-xl font-bold text-slate-800 mb-2">{title}</h3>
-          <p className="text-slate-500 text-sm leading-relaxed mb-6">{message}</p>
+          
+          {/* تم تعديل طريقة عرض الرسالة لتدعم الـ Node */}
+          <div className="text-slate-500 text-sm leading-relaxed mb-6">
+            {message}
+          </div>
 
           {requireTextConfirmation && (
             <div className="space-y-3 text-right">

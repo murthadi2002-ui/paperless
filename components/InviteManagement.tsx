@@ -30,7 +30,8 @@ const AVAILABLE_PERMISSIONS = [
   'تحميل ملفات',
   'إنشاء مشروع',
   'إدارة المشاريع',
-  'عرض تقارير'
+  'عرض تقارير',
+  'عرض الوثائق السرية'
 ];
 
 const InviteManagement: React.FC<InviteManagementProps> = ({ departments, employees, onInvite, onUpdateEmployee, positions }) => {

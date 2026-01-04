@@ -8,9 +8,10 @@ import {
   Plus, Trash, Users, Bell, Globe, Database, 
   ToggleRight, Sliders, HardDrive, ShieldAlert,
   Fingerprint, CreditCard, ChevronDown, Check, X,
-  Layout, Building2, Layers
+  Layout, Building2, Layers, Users2, ArrowRightLeft
 } from 'lucide-react';
 import TrashBin from './TrashBin';
+import ConfirmModal from './ConfirmModal';
 import { Document, Folder, User, Department } from '../types';
 import { CURRENT_USER } from '../constants';
 
@@ -23,7 +24,7 @@ interface SettingsPageProps {
   onRestoreFolder: (folder: Folder) => void;
   departments: Department[];
   onAddDept: (name: string) => Promise<void>;
-  onDeleteDepartment: (id: string) => Promise<void>;
+  onDeleteDepartment: (id: string, transferToId?: string) => Promise<void>;
 }
 
 const SettingsPage: React.FC<SettingsPageProps> = ({ 
@@ -34,6 +35,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [avatar, setAvatar] = useState(CURRENT_USER.avatar);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [newDeptName, setNewDeptName] = useState('');
+  
+  // States for deletion with transfer
+  const [deptToDeleteId, setDeptToDeleteId] = useState<string | null>(null);
+  const [transferTargetId, setTransferTargetId] = useState<string>('');
 
   const [profileData, setProfileData] = useState({
     name: CURRENT_USER.name,
@@ -51,6 +56,24 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     }
   };
 
+  const handleConfirmDeleteDept = async () => {
+    if (deptToDeleteId) {
+      const targetDept = departments.find(d => d.id === deptToDeleteId);
+      const hasEmployees = (targetDept?.employeeCount || 0) > 0;
+      
+      // إذا كان هناك موظفون ولم يتم اختيار قسم بديل، نمنع الحذف
+      if (hasEmployees && !transferTargetId) return;
+
+      await onDeleteDepartment(deptToDeleteId, transferTargetId || undefined);
+      setDeptToDeleteId(null);
+      setTransferTargetId('');
+    }
+  };
+
+  const selectedDeptForDeletion = departments.find(d => d.id === deptToDeleteId);
+  const hasEmployeesInSelected = (selectedDeptForDeletion?.employeeCount || 0) > 0;
+  const otherDepartments = departments.filter(d => d.id !== deptToDeleteId);
+
   const stats = useMemo(() => [
     { label: 'إجمالي الأقسام', value: departments.length, icon: Building2, color: 'text-indigo-600', bg: 'bg-indigo-50' },
     { label: 'سلة المهملات', value: deletedDocs.length + deletedFolders.length, icon: Trash2, color: 'text-red-500', bg: 'bg-red-50' },
@@ -60,6 +83,51 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 text-right" dir="rtl">
+      {/* Confirm Modal with Transfer Selection */}
+      <ConfirmModal 
+        isOpen={!!deptToDeleteId}
+        title="حذف القسم الإداري"
+        message={
+          <div className="space-y-4">
+            <p>هل أنت متأكد من حذف قسم <span className="font-black text-slate-800">"{selectedDeptForDeletion?.name}"</span>؟</p>
+            
+            {hasEmployeesInSelected ? (
+              <div className="bg-amber-50 border border-amber-100 p-5 rounded-2xl text-right space-y-4 animate-in slide-in-from-top-2">
+                <div className="flex items-center gap-3 text-amber-600 font-black text-xs">
+                  <Users2 size={16} /> تنبيه: هذا القسم يحتوي على ({selectedDeptForDeletion?.employeeCount}) موظف.
+                </div>
+                <p className="text-[11px] font-bold text-amber-700 leading-relaxed">يجب عليك اختيار قسم بديل لنقل هؤلاء الموظفين إليه قبل إتمام عملية الحذف:</p>
+                
+                <div className="relative">
+                  <ArrowRightLeft className="absolute right-3 top-1/2 -translate-y-1/2 text-amber-400" size={14} />
+                  <select 
+                    className="w-full pr-10 pl-4 py-3 bg-white border border-amber-200 rounded-xl text-xs font-black outline-none focus:ring-2 focus:ring-amber-500"
+                    value={transferTargetId}
+                    onChange={(e) => setTransferTargetId(e.target.value)}
+                  >
+                    <option value="">اختر القسم البديل...</option>
+                    {otherDepartments.map(d => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+                {!transferTargetId && <p className="text-[10px] text-red-500 font-black">* مطلوب اختيار قسم للمتابعة</p>}
+              </div>
+            ) : (
+              <p className="text-slate-400 text-xs">سيتم حذف القسم بشكل نهائي لأنه لا يحتوي على موظفين حالياً.</p>
+            )}
+          </div>
+        }
+        confirmLabel={hasEmployeesInSelected ? "نقل الموظفين وحذف القسم" : "نعم، احذف القسم"}
+        cancelLabel="تراجع"
+        type="danger"
+        onConfirm={handleConfirmDeleteDept}
+        onCancel={() => {
+          setDeptToDeleteId(null);
+          setTransferTargetId('');
+        }}
+      />
+
       {/* Header Section */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
@@ -150,44 +218,80 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 </div>
               </div>
 
-              {/* Edit Form Card */}
-              <div className="lg:col-span-8 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
-                 <h3 className="text-sm font-black text-slate-800 flex items-center gap-3"><Sliders size={18} className="text-emerald-600" /> البيانات الأساسية</h3>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">الاسم بالكامل</label>
-                       <div className="relative">
-                          <UserIcon className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                          <input type="text" className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.name} onChange={e => setProfileData({...profileData, name: e.target.value})} />
+              {/* Edit Form Card & Permissions */}
+              <div className="lg:col-span-8 space-y-6">
+                 <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
+                    <h3 className="text-sm font-black text-slate-800 flex items-center gap-3"><Sliders size={18} className="text-emerald-600" /> البيانات الأساسية</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">الاسم بالكامل</label>
+                          <div className="relative">
+                             <UserIcon className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                             <input type="text" className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.name} onChange={e => setProfileData({...profileData, name: e.target.value})} />
+                          </div>
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">البريد الإلكتروني</label>
+                          <div className="relative">
+                             <Mail className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                             <input type="email" className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.email} onChange={e => setProfileData({...profileData, email: e.target.value})} />
+                          </div>
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">رقم الهاتف</label>
+                          <div className="relative">
+                             <Smartphone className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                             <input type="text" className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.phone} onChange={e => setProfileData({...profileData, phone: e.target.value})} />
+                          </div>
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">المسمى الوظيفي</label>
+                          <div className="relative">
+                             <Briefcase className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                             <input type="text" className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.title} onChange={e => setProfileData({...profileData, title: e.target.value})} />
+                          </div>
                        </div>
                     </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">البريد الإلكتروني</label>
-                       <div className="relative">
-                          <Mail className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                          <input type="email" className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.email} onChange={e => setProfileData({...profileData, email: e.target.value})} />
-                       </div>
-                    </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">رقم الهاتف</label>
-                       <div className="relative">
-                          <Smartphone className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                          <input type="text" className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.phone} onChange={e => setProfileData({...profileData, phone: e.target.value})} />
-                       </div>
-                    </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">المسمى الوظيفي</label>
-                       <div className="relative">
-                          <Briefcase className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                          <input type="text" className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.title} onChange={e => setProfileData({...profileData, title: e.target.value})} />
-                       </div>
+                    
+                    <div className="pt-6 flex justify-end">
+                       <button className="px-10 py-3.5 bg-emerald-600 text-white rounded-xl font-black text-xs shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center gap-2 active:scale-95">
+                          <Save size={18} /> حفظ البيانات الشخصية
+                       </button>
                     </div>
                  </div>
-                 
-                 <div className="pt-6 flex justify-end">
-                    <button className="px-10 py-3.5 bg-emerald-600 text-white rounded-xl font-black text-xs shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center gap-2 active:scale-95">
-                       <Save size={18} /> حفظ البيانات الشخصية
-                    </button>
+
+                 {/* Granted Permissions Section - Read Only */}
+                 <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+                    <div className="flex items-center justify-between">
+                       <h3 className="text-sm font-black text-slate-800 flex items-center gap-3"><ShieldCheck size={18} className="text-indigo-600" /> الصلاحيات الممنوحة</h3>
+                       <div className="px-3 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-400 flex items-center gap-1.5"><Lock size={10}/> للقراءة فقط</div>
+                    </div>
+                    <p className="text-[11px] font-bold text-slate-400 leading-relaxed -mt-4">توضح القائمة أدناه الامتيازات الإدارية والفنية المفعلة على حسابك حالياً.</p>
+                    
+                    <div className="flex flex-wrap gap-2 pt-2">
+                       {CURRENT_USER.role === 'admin' ? (
+                          <div className="flex items-center gap-2.5 px-4 py-2.5 bg-indigo-50 border border-indigo-100 rounded-xl shadow-sm">
+                             <Zap size={14} className="text-indigo-600" fill="currentColor" />
+                             <span className="text-[11px] font-black text-indigo-700 uppercase">صلاحيات مدير النظام الكاملة</span>
+                          </div>
+                       ) : (
+                          <>
+                             {(CURRENT_USER.permissions && CURRENT_USER.permissions.length > 0) ? (
+                                CURRENT_USER.permissions.map((perm, idx) => (
+                                   <div key={idx} className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl shadow-sm text-[11px] font-black text-slate-600">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                                      {perm}
+                                   </div>
+                                ))
+                             ) : (
+                                <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl flex items-center gap-3 text-slate-400 italic">
+                                   <Shield size={16} />
+                                   <span className="text-[11px] font-bold">لم يتم تعيين صلاحيات مخصصة بعد.</span>
+                                </div>
+                             )}
+                          </>
+                       )}
+                    </div>
                  </div>
               </div>
             </div>
@@ -243,8 +347,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                               <p className="text-[9px] font-bold text-slate-400 mt-0.5">{dept.employeeCount || 0} موظف مكلف</p>
                            </div>
                         </div>
-                        <button onClick={() => onDeleteDepartment(dept.id)} className="p-2 text-slate-200 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
-                           <Trash2 size={16}/>
+                        <button 
+                          onClick={() => setDeptToDeleteId(dept.id)} 
+                          className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                        >
+                           <Trash2 size={18}/>
                         </button>
                       </div>
                     ))}

@@ -67,6 +67,7 @@ export interface Folder {
   color?: string;
   deletedAt?: string | null;
   projectId?: string;
+  isConfidential?: boolean;
 }
 
 export interface WorkflowTask {
@@ -97,6 +98,7 @@ export interface Document {
   deletedAt?: string | null;
   isSleeve?: boolean;
   isPinned?: boolean;
+  isConfidential?: boolean;
   tasks: WorkflowTask[];
 }
 

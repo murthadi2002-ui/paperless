@@ -2,6 +2,7 @@
   "name": "Paperless - Intelligent Archiving System",
   "description": "A smart administrative archiving system for managing incoming and outgoing correspondence with AI-powered OCR, summarization, and project linking.",
   "requestFramePermissions": [
-    "camera"
+    "camera",
+    "microphone"
   ]
 }

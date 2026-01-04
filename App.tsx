@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   collection, onSnapshot, addDoc, updateDoc, 
   deleteDoc, doc, query, orderBy, where, 
-  setDoc, getDoc, serverTimestamp 
+  setDoc, getDoc, serverTimestamp, writeBatch
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -51,7 +51,6 @@ const App: React.FC = () => {
   const [employees, setEmployees] = useState<User[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
   
-  // حالة المشروع المختار حالياً في فلتر الأرشيف
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
 
@@ -59,7 +58,6 @@ const App: React.FC = () => {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'doc' | 'folder' | 'attachment' | 'project', parentId?: string } | null>(null);
 
-  // تحديث المشروع المختار تلقائياً ليكون الأحدث عند تحميل البيانات
   useEffect(() => {
     if (projects.length > 0 && selectedProjectId === 'all') {
       const latest = [...projects].sort((a, b) => 
@@ -111,7 +109,6 @@ const App: React.FC = () => {
 
   const handleAddFolder = async (folder: any) => {
     const { id, ...data } = folder;
-    // التأكد من ربط الإضبارة بالمشروع المختار حالياً
     const folderData = { 
       ...data, 
       projectId: selectedProjectId !== 'all' ? selectedProjectId : (data.projectId || null) 
@@ -124,7 +121,6 @@ const App: React.FC = () => {
     const { id, ...data } = project;
     const cleanData = JSON.parse(JSON.stringify(data));
     const docRef = await addDoc(collection(db, "projects"), { ...cleanData, createdAt: serverTimestamp() });
-    // جعل المشروع الجديد هو المختار تلقائياً
     setSelectedProjectId(docRef.id);
   };
 
@@ -139,6 +135,35 @@ const App: React.FC = () => {
 
   const handleAddDept = async (name: string) => {
     await addDoc(collection(db, "departments"), { name, employeeCount: 0 });
+  };
+
+  const handleDeleteDepartment = async (id: string, transferToId?: string) => {
+    try {
+      const deptToDelete = departments.find(d => d.id === id);
+      if (!deptToDelete) return;
+
+      if (transferToId) {
+        const targetDept = departments.find(d => d.id === transferToId);
+        if (targetDept) {
+          const batch = writeBatch(db);
+          const usersToTransfer = employees.filter(e => e.department === deptToDelete.name);
+          
+          usersToTransfer.forEach(user => {
+            batch.update(doc(db, "users", user.id), { department: targetDept.name });
+          });
+
+          batch.update(doc(db, "departments", targetDept.id), { 
+            employeeCount: (targetDept.employeeCount || 0) + (deptToDelete.employeeCount || 0) 
+          });
+
+          await batch.commit();
+        }
+      }
+
+      await deleteDoc(doc(db, "departments", id));
+    } catch (e) {
+      console.error("Delete Dept Error:", e);
+    }
   };
 
   const handleAddTask = async (docId: string, task: WorkflowTask) => {
@@ -228,7 +253,14 @@ const App: React.FC = () => {
           />
         );
       case 'my-tasks': return <EmployeePortal documents={activeDocs} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
-      case 'messages': return <MessagingPage documents={activeDocs} folders={activeFolders} onArchiveFile={()=>{}} />;
+      case 'messages': return (
+        <MessagingPage 
+          documents={activeDocs} 
+          folders={activeFolders} 
+          projects={projects} 
+          onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); setActiveTab('documents'); }}
+        />
+      );
       case 'projects':
         if (activeProjectView === 'details' && currentProject) return <ProjectDetailsView project={currentProject} documents={activeDocs} folders={activeFolders} onBack={()=>{setActiveProjectView('list');setCurrentProject(null)}} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
         return (
@@ -257,7 +289,7 @@ const App: React.FC = () => {
             onRestoreFolder={async (fObj)=> await updateDoc(doc(db, "folders", fObj.id), { deletedAt: null })} 
             departments={departments} 
             onAddDept={handleAddDept}
-            onDeleteDepartment={async (id)=> await deleteDoc(doc(db, "departments", id))} 
+            onDeleteDepartment={handleDeleteDepartment} 
           />
         );
       default: return <Dashboard documents={activeDocs} />;
@@ -274,7 +306,6 @@ const App: React.FC = () => {
       onLogout={() => { setCurrentUser(null); setCurrentOrg(null); }}
       organizationName={currentOrg.name}
     >
-      {/* DB Connection Error Bar */}
       {dbError && (
         <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-2xl flex items-center justify-between animate-pulse">
            <div className="flex items-center gap-3">
