@@ -7,7 +7,7 @@ import {
   FileImage, FileCode, FileQuestion, SendHorizontal, 
   Clock, UserCheck, AlertCircle, Users, CheckSquare,
   X, History, Plus, Edit3, Upload, FileUp, UserPlus,
-  ArrowLeft
+  ArrowLeft, Send
 } from 'lucide-react';
 import { Document, Attachment, User as UserType, WorkflowTask, DocStatus } from '../types';
 import { MOCK_EMPLOYEES, CURRENT_USER } from '../constants';
@@ -264,6 +264,7 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
                  { label: 'الرقم المرجعي', value: doc.refNumber, icon: Hash, color: 'text-indigo-600' },
                  { label: 'تاريخ الكتاب', value: doc.date, icon: Calendar, color: 'text-emerald-600' },
                  { label: 'جهة الإصدار', value: doc.sender, icon: Building2, color: 'text-blue-600' },
+                 { label: 'جهة الاستلام', value: doc.receiver || 'غير محدد', icon: Send, color: 'text-cyan-600' },
                  { label: 'الحالة الحالية', value: doc.status, icon: CheckSquare, color: 'text-amber-600' }
                ].map((item, idx) => (
                  <div key={idx} className="flex items-center justify-between p-4.5 bg-slate-50/50 rounded-2xl border border-slate-100/50">
@@ -325,7 +326,6 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {doc.attachments.map((file) => (
                   <div key={file.id} className="group bg-slate-50/50 p-5 rounded-[2rem] border border-slate-100 hover:bg-white hover:shadow-xl hover:border-emerald-100 transition-all flex items-center justify-between gap-4">
-                     {/* Fix: Merged duplicate className attributes on line 328 */}
                      <div className="flex items-center gap-4 min-w-0 cursor-pointer" onClick={() => handlePreviewFile(file)}>
                         <div className="p-3 bg-white rounded-2xl text-emerald-600 shadow-sm group-hover:scale-110 transition-transform">
                            <FileText size={24} />
