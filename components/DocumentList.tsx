@@ -109,7 +109,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
            {filteredFolders.map(folder => {
              const docCount = documents.filter(d => d.folderId === folder.id).length;
              return (
-               <div key={folder.id} onClick={() => setActiveFolderId(folder.id)} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group flex flex-col items-center text-center relative">
+               <div key={folder.id} onClick={() => setActiveFolderId(folder.id)} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group flex flex-col items-center text-center relative">
                   <div className="absolute top-4 left-4">
                     <button onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === folder.id ? null : folder.id); }} className="p-1.5 text-slate-300 hover:text-slate-600 hover:bg-slate-50 rounded-lg"><MoreVertical size={16} /></button>
                     {activeMenu === folder.id && (
@@ -120,7 +120,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
                       </div>
                     )}
                   </div>
-                  <div className={`w-20 h-20 rounded-[1.8rem] ${folder.color || 'bg-emerald-500'} text-white shadow-xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-500`}>
+                  <div className={`w-20 h-20 rounded-xl ${folder.color || 'bg-emerald-500'} text-white shadow-xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-500`}>
                      <FolderIcon size={36} fill="white" />
                   </div>
                   <h4 className="text-sm font-black text-slate-800 mb-1">{folder.name}</h4>
@@ -132,8 +132,8 @@ const DocumentList: React.FC<DocumentListProps> = ({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 animate-in fade-in duration-300">
           {filteredDocs.map((doc) => (
-            <div key={doc.id} onClick={() => onOpenUnit(doc)} className="group bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer flex flex-col aspect-square relative overflow-hidden">
-              {doc.isPinned && <div className="absolute top-0 left-0 p-2 bg-amber-400 text-white rounded-br-xl z-10"><Star size={12} fill="white" /></div>}
+            <div key={doc.id} onClick={() => onOpenUnit(doc)} className="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer flex flex-col aspect-square relative overflow-hidden">
+              {doc.isPinned && <div className="absolute top-0 left-0 p-2 bg-amber-400 text-white rounded-br-lg z-10"><Star size={12} fill="white" /></div>}
               <div className="flex justify-between items-start mb-4">
                 <div className={`p-2.5 rounded-xl ${doc.type === DocType.INCOMING ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600 shadow-inner'}`}>
                   {doc.type === DocType.INCOMING ? <FileDown size={20} /> : <FileUp size={20} />}

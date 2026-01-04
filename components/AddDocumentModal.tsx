@@ -121,12 +121,11 @@ const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-      {/* Container with max-width smaller for "Compact" look and centered */}
-      <div className="bg-white w-full max-w-2xl max-h-[85vh] rounded-[1.5rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-slate-200">
+      <div className="bg-white w-full max-w-2xl max-h-[85vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-slate-200">
         {/* Header - Compact */}
         <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-sm">
+            <div className="p-2 rounded-lg bg-emerald-600 text-white shadow-sm">
               <FileText size={18} />
             </div>
             <div>
@@ -139,8 +138,7 @@ const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
 
         {/* Content Body */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-          {/* Main Info Section */}
-          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 space-y-4">
+          <div className="bg-slate-50 p-5 rounded-xl border border-slate-100 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mr-1">رقم الكتاب *</label>
@@ -169,7 +167,6 @@ const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
             </div>
           </div>
 
-          {/* Classification Section */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mr-1 flex items-center gap-1"><Briefcase size={10}/> المشروع</label>
@@ -187,7 +184,6 @@ const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
             </div>
           </div>
 
-          {/* Upload & Files Section */}
           <div className="space-y-4">
             <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center bg-slate-50/50 hover:bg-emerald-50/50 hover:border-emerald-300 transition-all cursor-pointer group shadow-inner">
               <input type="file" multiple ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
@@ -214,7 +210,6 @@ const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
           </div>
         </form>
 
-        {/* Footer - Slim */}
         <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between shrink-0">
           <div className="flex-1">
             {!isFormValid && (
@@ -224,8 +219,8 @@ const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
             )}
           </div>
           <div className="flex gap-2">
-            <button type="button" onClick={onClose} className="px-5 py-2 rounded-xl text-[10px] font-black text-slate-500 hover:bg-slate-200 transition-all">إلغاء</button>
-            <button onClick={handleSubmit} disabled={!isFormValid || processing} className="px-8 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 disabled:opacity-50 transition-all flex items-center gap-2 active:scale-95">
+            <button type="button" onClick={onClose} className="px-5 py-2 rounded-lg text-[10px] font-black text-slate-500 hover:bg-slate-200 transition-all">إلغاء</button>
+            <button onClick={handleSubmit} disabled={!isFormValid || processing} className="px-8 py-2 bg-emerald-600 text-white rounded-lg text-[10px] font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 disabled:opacity-50 transition-all flex items-center gap-2 active:scale-95">
               <Save size={16} /> حفظ الأرشفة
             </button>
           </div>

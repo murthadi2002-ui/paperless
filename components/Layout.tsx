@@ -16,7 +16,7 @@ interface LayoutProps {
 
 const LogoP = ({ size = 22 }: { size?: number }) => (
   <div 
-    className="bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-200 flex items-center justify-center font-black"
+    className="bg-emerald-600 text-white rounded-lg shadow-lg shadow-emerald-200 flex items-center justify-center font-black"
     style={{ width: size * 1.8, height: size * 1.8, fontSize: size }}
   >
     P
@@ -38,7 +38,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAd
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-cairo transition-all duration-300 text-right" dir="rtl">
-      {/* Sidebar - Reduced width from w-64 to w-52 */}
+      {/* Sidebar */}
       <aside className={`${isCollapsed ? 'w-16' : 'w-52'} bg-white border-l border-slate-200 flex flex-col transition-all duration-300 z-40 relative shadow-xl shadow-slate-200/30`}>
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)} 
@@ -59,7 +59,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAd
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5 px-3'} py-3 rounded-2xl text-[11px] font-black transition-all duration-200 group ${
+                className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5 px-3'} py-3 rounded-xl text-[11px] font-black transition-all duration-200 group ${
                   activeTab === item.id 
                     ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' 
                     : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
@@ -73,8 +73,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAd
         </nav>
 
         <div className="p-2 border-t border-slate-100">
-          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5 p-2.5 bg-slate-50 rounded-2xl'} transition-all`}>
-            <img src={CURRENT_USER.avatar} alt="User" className="w-8 h-8 rounded-xl border-2 border-white shadow-sm shrink-0 object-cover" />
+          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5 p-2.5 bg-slate-50 rounded-xl'} transition-all`}>
+            <img src={CURRENT_USER.avatar} alt="User" className="w-8 h-8 rounded-lg border-2 border-white shadow-sm shrink-0 object-cover" />
             {!isCollapsed && (
               <>
                 <div className="flex-1 overflow-hidden text-right">
@@ -102,7 +102,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAd
           </div>
           
           <div className="flex items-center gap-4">
-            <button onClick={onAddClick} className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl text-[10px] font-black flex items-center gap-2 transition-all shadow-lg shadow-emerald-100 active:scale-95">
+            <button onClick={onAddClick} className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg text-[10px] font-black flex items-center gap-2 transition-all shadow-lg shadow-emerald-100 active:scale-95">
               <PlusCircle size={14} />
               <span className="hidden sm:inline">أرشفة كتاب جديد</span>
             </button>

@@ -36,7 +36,7 @@ const Dashboard: React.FC<DashboardProps> = ({ documents, onOpenDoc }) => {
           <input 
             type="text" 
             placeholder="بحث سريع برقم الكتاب أو الموضوع..." 
-            className="w-72 pr-10 pl-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-[11px] font-black focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all shadow-sm"
+            className="w-72 pr-10 pl-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[11px] font-black focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all shadow-sm"
           />
         </div>
       </div>
@@ -46,13 +46,13 @@ const Dashboard: React.FC<DashboardProps> = ({ documents, onOpenDoc }) => {
         {stats.map((stat, idx) => {
           const Icon = stat.icon;
           return (
-            <div key={idx} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
+            <div key={idx} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
                   <h3 className="text-3xl font-black text-slate-800">{stat.value}</h3>
                 </div>
-                <div className={`${stat.bg} ${stat.color} p-4 rounded-2xl transition-transform group-hover:scale-110 shadow-sm`}>
+                <div className={`${stat.bg} ${stat.color} p-4 rounded-xl transition-transform group-hover:scale-110 shadow-sm`}>
                   <Icon size={22} />
                 </div>
               </div>
@@ -63,10 +63,10 @@ const Dashboard: React.FC<DashboardProps> = ({ documents, onOpenDoc }) => {
 
       {/* Workflow Section */}
       {taskedDocs.length > 0 && (
-        <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-6 px-10 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
              <div className="flex items-center gap-3">
-               <div className="p-2 bg-amber-500 text-white rounded-xl shadow-lg"><Send size={18} /></div>
+               <div className="p-2 bg-amber-500 text-white rounded-lg shadow-lg"><Send size={18} /></div>
                <h3 className="font-black text-slate-800 text-sm">متابعة سجل التوجيهات الإدارية</h3>
              </div>
              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-4 py-1.5 rounded-full border border-slate-200">{taskedDocs.length} مهام بانتظار الإجابة</span>
@@ -80,8 +80,8 @@ const Dashboard: React.FC<DashboardProps> = ({ documents, onOpenDoc }) => {
                const assignees = MOCK_EMPLOYEES.filter(e => activeTask.assigneeIds.includes(e.id));
 
                return (
-                 <div key={doc.id} onClick={() => onOpenDoc?.(doc)} className="bg-white p-6 rounded-[2.8rem] border border-slate-100 hover:shadow-2xl hover:border-emerald-200 transition-all cursor-pointer group flex flex-col h-full shadow-sm relative">
-                    <div className="flex flex-col gap-3.5 mb-6 bg-slate-50/80 p-5 rounded-[2rem] border border-slate-100/50">
+                 <div key={doc.id} onClick={() => onOpenDoc?.(doc)} className="bg-white p-6 rounded-2xl border border-slate-100 hover:shadow-2xl hover:border-emerald-200 transition-all cursor-pointer group flex flex-col h-full shadow-sm relative">
+                    <div className="flex flex-col gap-3.5 mb-6 bg-slate-50/80 p-5 rounded-xl border border-slate-100/50">
                       <div className="flex items-center self-start gap-3 bg-white px-4 py-2.5 rounded-full border border-emerald-100 shadow-sm transition-transform group-hover:scale-105 ring-2 ring-emerald-50/20">
                         <span className="text-[8px] font-black text-emerald-400 uppercase">مِن:</span>
                         <img src={issuer?.avatar} className="w-6 h-6 rounded-full object-cover border-2 border-white shadow-sm" alt="" />
@@ -121,7 +121,7 @@ const Dashboard: React.FC<DashboardProps> = ({ documents, onOpenDoc }) => {
 
       {/* Main Content Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white rounded-[3rem] border border-slate-200 overflow-hidden shadow-sm flex flex-col h-full">
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm flex flex-col h-full">
           <div className="p-6 px-10 border-b border-slate-100 flex items-center justify-between">
             <h3 className="font-black text-slate-800 text-sm">آخر المراسلات والأرشفة الرسمية</h3>
             <button className="text-emerald-600 text-[10px] font-black hover:bg-emerald-50 px-4 py-2 rounded-xl transition-all uppercase tracking-widest">عرض سجل الأرشيف</button>
@@ -129,7 +129,7 @@ const Dashboard: React.FC<DashboardProps> = ({ documents, onOpenDoc }) => {
           <div className="divide-y divide-slate-50">
             {documents.slice(0, 5).map((doc) => (
               <div key={doc.id} onClick={() => onOpenDoc?.(doc)} className="p-6 px-10 hover:bg-slate-50 transition-colors flex items-center gap-6 cursor-pointer group">
-                <div className={`p-4 rounded-2xl transition-transform group-hover:rotate-12 ${doc.type === DocType.INCOMING ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                <div className={`p-4 rounded-xl transition-transform group-hover:rotate-12 ${doc.type === DocType.INCOMING ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-50 text-emerald-600'}`}>
                   {doc.type === DocType.INCOMING ? <FileDown size={20} /> : <FileUp size={20} />}
                 </div>
                 <div className="flex-1 overflow-hidden">
@@ -153,7 +153,7 @@ const Dashboard: React.FC<DashboardProps> = ({ documents, onOpenDoc }) => {
           </div>
         </div>
 
-        <div className="bg-white rounded-[3rem] border border-slate-200 p-8 shadow-sm h-fit">
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm h-fit">
           <h3 className="font-black text-slate-800 mb-8 flex items-center gap-3 text-sm uppercase tracking-widest border-b border-slate-50 pb-4">
              <AlertTriangle size={18} className="text-emerald-600" /> سجل النشاط اللحظي
           </h3>
@@ -166,7 +166,7 @@ const Dashboard: React.FC<DashboardProps> = ({ documents, onOpenDoc }) => {
               const Icon = activity.icon;
               return (
                 <div key={idx} className="flex gap-4 group">
-                  <div className={`w-12 h-12 rounded-2xl ${activity.bg} flex items-center justify-center ${activity.color} border border-slate-100 shadow-sm transition-all group-hover:scale-110`}>
+                  <div className={`w-12 h-12 rounded-xl ${activity.bg} flex items-center justify-center ${activity.color} border border-slate-100 shadow-sm transition-all group-hover:scale-110`}>
                     <Icon size={18} />
                   </div>
                   <div className="overflow-hidden">
