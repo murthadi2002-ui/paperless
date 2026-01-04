@@ -1,12 +1,14 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
   Settings, Shield, Trash2, Building, Archive, Save, 
   User as UserIcon, Camera, Mail, Key, Briefcase, Eye, 
   EyeOff, Lock, RefreshCw, CheckCircle2, AlertCircle, 
   Smartphone, ShieldCheck, Zap, FileJson, Activity, 
   Plus, Trash, Users, Bell, Globe, Database, 
-  ToggleRight, Sliders, HardDrive, ShieldAlert
+  ToggleRight, Sliders, HardDrive, ShieldAlert,
+  Fingerprint, CreditCard, ChevronDown, Check, X,
+  Layout, Building2, Layers
 } from 'lucide-react';
 import TrashBin from './TrashBin';
 import { Document, Folder, User, Department } from '../types';
@@ -24,20 +26,11 @@ interface SettingsPageProps {
   onDeleteDepartment: (id: string) => Promise<void>;
 }
 
-const LogoP = ({ size = 20 }: { size?: number }) => (
-  <div 
-    className="bg-emerald-600 text-white rounded-lg shadow-sm flex items-center justify-center font-black"
-    style={{ width: size * 1.6, height: size * 1.6, fontSize: size }}
-  >
-    P
-  </div>
-);
-
 const SettingsPage: React.FC<SettingsPageProps> = ({ 
   deletedDocs, deletedFolders, autoOpenFiles, setAutoOpenFiles, 
   onRestoreDoc, onRestoreFolder, departments, onAddDept, onDeleteDepartment
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'general' | 'archiving' | 'trash'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'organization' | 'archiving' | 'trash'>('profile');
   const [avatar, setAvatar] = useState(CURRENT_USER.avatar);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [newDeptName, setNewDeptName] = useState('');
@@ -45,7 +38,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [profileData, setProfileData] = useState({
     name: CURRENT_USER.name,
     email: CURRENT_USER.email,
-    title: 'المدير التنفيذي',
+    title: 'المدير التنفيذي للعمليات',
     phone: '+964 770 123 4567'
   });
 
@@ -58,72 +51,285 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     }
   };
 
-  return (
-    <div className="space-y-6 animate-in fade-in duration-700 text-right" dir="rtl">
-      <div className="flex flex-col lg:flex-row gap-10">
-        <aside className="w-full lg:w-80 shrink-0">
-          <div className="bg-white p-5 rounded-[2.8rem] border border-slate-200 shadow-sm space-y-1">
-            {[
-              { id: 'profile', label: 'الملف الشخصي', icon: UserIcon, desc: 'إدارة الهوية والبيانات' },
-              { id: 'general', label: 'إعدادات المنشأة', icon: Building, desc: 'الهيكل الإداري والأقسام' },
-              { id: 'archiving', label: 'قواعد الأرشفة', icon: Archive, desc: 'محرك الذكاء والـ OCR' },
-              { id: 'trash', label: 'سلة المهملات', icon: Trash2, desc: 'استعادة المحذوفات', count: deletedDocs.length + deletedFolders.length },
-            ].map((tab) => (
-              <button key={tab.id} onClick={() => setActiveSubTab(tab.id as any)} className={`w-full flex items-center justify-between px-5 py-4 rounded-[1.8rem] transition-all ${activeSubTab === tab.id ? 'bg-emerald-600 text-white shadow-2xl shadow-emerald-100' : 'text-slate-500 hover:bg-slate-50'}`}>
-                <div className="flex items-center gap-4">
-                  <div className={`p-2.5 rounded-xl ${activeSubTab === tab.id ? 'bg-white/20' : 'bg-slate-50'}`}><tab.icon size={18} /></div>
-                  <div className="text-right"><p className="text-[13px] font-black">{tab.label}</p><p className={`text-[10px] font-bold opacity-60`}>{tab.desc}</p></div>
-                </div>
-                {tab.count !== undefined && tab.count > 0 && <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${activeSubTab === tab.id ? 'bg-white text-emerald-600' : 'bg-emerald-100 text-emerald-700'}`}>{tab.count}</span>}
-              </button>
-            ))}
-          </div>
-        </aside>
+  const stats = useMemo(() => [
+    { label: 'إجمالي الأقسام', value: departments.length, icon: Building2, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { label: 'سلة المهملات', value: deletedDocs.length + deletedFolders.length, icon: Trash2, color: 'text-red-500', bg: 'bg-red-50' },
+    { label: 'حالة النظام', value: 'نشط', icon: Activity, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+    { label: 'مستوى الأمان', value: 'مرتفع', icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-50' }
+  ], [departments, deletedDocs, deletedFolders]);
 
-        <div className="flex-1 bg-white border border-slate-200 rounded-[3.5rem] shadow-sm overflow-hidden min-h-[650px] relative">
-          
-          {activeSubTab === 'profile' && (
-            <div className="p-10 lg:p-16 space-y-12 animate-in slide-in-from-bottom-6">
-              <div className="flex flex-col md:flex-row gap-16 items-start">
-                <div className="relative group mx-auto md:mx-0">
-                  <div className="w-48 h-48 rounded-[3.5rem] overflow-hidden border-8 border-slate-50 shadow-2xl relative"><img src={avatar} alt="Profile" className="w-full h-full object-cover" /></div>
-                  <button onClick={() => fileInputRef.current?.click()} className="absolute -bottom-2 -right-2 p-4 bg-emerald-600 text-white rounded-2xl shadow-xl hover:bg-emerald-700 transition-all border-4 border-white"><Camera size={20} /></button>
+  return (
+    <div className="space-y-8 animate-in fade-in duration-700 text-right" dir="rtl">
+      {/* Header Section */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+           <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-xl shadow-emerald-100/50 flex items-center justify-center">
+             <Settings size={28} />
+           </div>
+           <div>
+             <h2 className="text-2xl font-black text-slate-900 tracking-tight">إعدادات النظام</h2>
+             <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">تخصيص تجربة الأرشفة، إدارة الهوية المؤسسية، والتحكم في قواعد البيانات.</p>
+           </div>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {stats.map((stat, i) => (
+          <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+            <div className={`p-3.5 rounded-xl ${stat.bg} ${stat.color} shadow-inner`}>
+              <stat.icon size={22} />
+            </div>
+            <div className="text-left">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
+              <h3 className="text-2xl font-black text-slate-800 tracking-tighter">{stat.value}</h3>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Main Content Area */}
+      <div className="space-y-6">
+        {/* Horizontal Navigation Tabs */}
+        <div className="flex items-center justify-between bg-white/60 p-2 rounded-2xl border border-slate-200 shadow-sm backdrop-blur-sm">
+          <div className="flex gap-1.5 flex-wrap">
+            <button 
+              onClick={() => setActiveTab('profile')} 
+              className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'profile' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white'}`}
+            >
+              <UserIcon size={16} /> الملف الشخصي
+            </button>
+            <button 
+              onClick={() => setActiveTab('organization')} 
+              className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'organization' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white'}`}
+            >
+              <Building size={16} /> إعدادات المنشأة
+            </button>
+            <button 
+              onClick={() => setActiveTab('archiving')} 
+              className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'archiving' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white'}`}
+            >
+              <Archive size={16} /> تفضيلات الأرشفة
+            </button>
+            <button 
+              onClick={() => setActiveTab('trash')} 
+              className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'trash' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white'}`}
+            >
+              <Trash2 size={16} /> سلة المهملات
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Content Rendering */}
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {activeTab === 'profile' && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Profile Card */}
+              <div className="lg:col-span-4 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col items-center text-center">
+                <div className="relative group mb-6">
+                  <div className="w-36 h-36 rounded-3xl overflow-hidden border-4 border-slate-50 shadow-xl relative">
+                    <img src={avatar} alt="Profile" className="w-full h-full object-cover" />
+                  </div>
+                  <button onClick={() => fileInputRef.current?.click()} className="absolute -bottom-2 -right-2 p-3 bg-emerald-600 text-white rounded-xl shadow-lg hover:bg-emerald-700 transition-all border-2 border-white">
+                    <Camera size={16} />
+                  </button>
                   <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarChange} />
                 </div>
-                <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-3">الاسم الكامل</label><input type="text" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-[1.5rem] font-black text-slate-700 outline-none" value={profileData.name} onChange={e => setProfileData({...profileData, name: e.target.value})} /></div>
-                  <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-3">المسمى الوظيفي</label><input type="text" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-[1.5rem] font-black text-slate-700 outline-none" value={profileData.title} onChange={e => setProfileData({...profileData, title: e.target.value})} /></div>
+                <h4 className="text-xl font-black text-slate-800">{profileData.name}</h4>
+                <p className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-4 py-1.5 rounded-full mt-2 border border-emerald-100">{profileData.title}</p>
+                
+                <div className="w-full mt-8 pt-8 border-t border-slate-50 space-y-4">
+                   <div className="flex items-center justify-between text-right">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">معرف المستخدم</span>
+                      <span className="text-[11px] font-bold text-slate-700 tracking-tight">#{CURRENT_USER.id.toUpperCase()}</span>
+                   </div>
+                   <div className="flex items-center justify-between text-right">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">تاريخ الانضمام</span>
+                      <span className="text-[11px] font-bold text-slate-700 tracking-tight">{CURRENT_USER.joinedDate || '2023-01-01'}</span>
+                   </div>
                 </div>
+              </div>
+
+              {/* Edit Form Card */}
+              <div className="lg:col-span-8 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
+                 <h3 className="text-sm font-black text-slate-800 flex items-center gap-3"><Sliders size={18} className="text-emerald-600" /> البيانات الأساسية</h3>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">الاسم بالكامل</label>
+                       <div className="relative">
+                          <UserIcon className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                          <input type="text" className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.name} onChange={e => setProfileData({...profileData, name: e.target.value})} />
+                       </div>
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">البريد الإلكتروني</label>
+                       <div className="relative">
+                          <Mail className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                          <input type="email" className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.email} onChange={e => setProfileData({...profileData, email: e.target.value})} />
+                       </div>
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">رقم الهاتف</label>
+                       <div className="relative">
+                          <Smartphone className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                          <input type="text" className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.phone} onChange={e => setProfileData({...profileData, phone: e.target.value})} />
+                       </div>
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">المسمى الوظيفي</label>
+                       <div className="relative">
+                          <Briefcase className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                          <input type="text" className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.title} onChange={e => setProfileData({...profileData, title: e.target.value})} />
+                       </div>
+                    </div>
+                 </div>
+                 
+                 <div className="pt-6 flex justify-end">
+                    <button className="px-10 py-3.5 bg-emerald-600 text-white rounded-xl font-black text-xs shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center gap-2 active:scale-95">
+                       <Save size={18} /> حفظ البيانات الشخصية
+                    </button>
+                 </div>
               </div>
             </div>
           )}
 
-          {activeSubTab === 'general' && (
-            <div className="p-10 lg:p-16 space-y-12 animate-in slide-in-from-bottom-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-3">اسم المنشأة</label><input type="text" className="w-full pr-6 pl-6 py-4 bg-slate-50 border border-slate-100 rounded-[1.5rem] font-black text-slate-800 outline-none" defaultValue="المنشأة الوطنية" /></div>
-                <div className="bg-slate-50 p-10 rounded-[3rem] border border-slate-100">
-                  <h4 className="text-[11px] font-black text-slate-400 uppercase mb-8 flex items-center gap-2"><Users size={18} className="text-emerald-600" /> إدارة الأقسام</h4>
-                  <div className="space-y-3 mb-8 overflow-y-auto max-h-[300px] custom-scrollbar">
+          {activeTab === 'organization' && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Org Identity */}
+              <div className="lg:col-span-5 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
+                 <h3 className="text-sm font-black text-slate-800 flex items-center gap-3"><Building size={18} className="text-emerald-600" /> هوية المنشأة</h3>
+                 <div className="space-y-6">
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">اسم المنشأة الرسمي</label>
+                       <input type="text" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" defaultValue="مجموعة الفاو الهندسية" />
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">رمز تعريف المنشأة</label>
+                       <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl flex items-center justify-between">
+                          <span className="font-black text-slate-700 tracking-widest">PAPER-7X9Y</span>
+                          <span className="text-[8px] font-black text-slate-400 bg-white px-2 py-1 rounded border border-slate-100">رقمي - ثابت</span>
+                       </div>
+                    </div>
+                    <div className="p-6 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-4">
+                       <div className="flex items-center gap-3">
+                          <Globe size={18} className="text-indigo-600" />
+                          <h4 className="text-[11px] font-black text-indigo-900">إعدادات النطاق المخصص</h4>
+                       </div>
+                       <p className="text-[10px] font-bold text-indigo-600/80 leading-relaxed">يمكنك ربط تطبيق Paperless بنطاق بريدي خاص بشركتك لتفعيل تسجيل الدخول الموحد (SSO).</p>
+                       <button className="text-[10px] font-black text-indigo-700 underline">إعداد النطاق المخصص الآن</button>
+                    </div>
+                 </div>
+              </div>
+
+              {/* Departments Management */}
+              <div className="lg:col-span-7 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
+                 <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-black text-slate-800 flex items-center gap-3"><Building2 size={18} className="text-emerald-600" /> الهيكل التنظيمي (الأقسام)</h3>
+                    <div className="flex gap-2">
+                       <input type="text" placeholder="اسم القسم الجديد..." className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/10" value={newDeptName} onChange={e => setNewDeptName(e.target.value)} />
+                       <button onClick={async () => { if(!newDeptName) return; await onAddDept(newDeptName); setNewDeptName(''); }} className="p-2.5 bg-emerald-600 text-white rounded-xl shadow-lg hover:bg-emerald-700 transition-all"><Plus size={18}/></button>
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                     {departments.map(dept => (
-                      <div key={dept.id} className="bg-white p-4 px-6 rounded-2xl border border-slate-100 flex items-center justify-between group">
-                        <span className="text-sm font-black text-slate-700">{dept.name}</span>
-                        <button onClick={() => onDeleteDepartment(dept.id)} className="p-2 text-slate-200 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"><Trash size={16}/></button>
+                      <div key={dept.id} className="bg-slate-50/80 p-5 rounded-2xl border border-slate-100 flex items-center justify-between group hover:bg-white hover:border-emerald-200 transition-all">
+                        <div className="flex items-center gap-3">
+                           <div className="p-2 bg-white rounded-lg shadow-sm text-slate-400 group-hover:text-emerald-600 transition-colors">
+                              <Layout size={16} />
+                           </div>
+                           <div>
+                              <p className="text-xs font-black text-slate-800">{dept.name}</p>
+                              <p className="text-[9px] font-bold text-slate-400 mt-0.5">{dept.employeeCount || 0} موظف مكلف</p>
+                           </div>
+                        </div>
+                        <button onClick={() => onDeleteDepartment(dept.id)} className="p-2 text-slate-200 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+                           <Trash2 size={16}/>
+                        </button>
                       </div>
                     ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <input type="text" placeholder="اسم القسم..." className="flex-1 px-5 py-3 bg-white border border-slate-100 rounded-xl text-xs font-bold" value={newDeptName} onChange={e => setNewDeptName(e.target.value)} />
-                    <button onClick={async () => { if(!newDeptName) return; await onAddDept(newDeptName); setNewDeptName(''); }} className="p-3 bg-emerald-600 text-white rounded-xl shadow-lg"><Plus size={20}/></button>
-                  </div>
-                </div>
+                    {departments.length === 0 && (
+                       <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-100 rounded-3xl">
+                          <Building2 size={48} className="mx-auto text-slate-100 mb-4" />
+                          <p className="text-xs font-black text-slate-300 uppercase tracking-widest">لا توجد أقسام معرفة حالياً</p>
+                       </div>
+                    )}
+                 </div>
               </div>
             </div>
           )}
 
-          {activeSubTab === 'trash' && (
-            <div className="p-10 lg:p-16 space-y-12">
-               <TrashBin deletedDocs={deletedDocs} deletedFolders={deletedFolders} onRestoreDoc={onRestoreDoc} onRestoreFolder={onRestoreFolder} />
+          {activeTab === 'archiving' && (
+            <div className="max-w-3xl mx-auto bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm space-y-10">
+               <div className="flex items-center gap-4 border-b border-slate-50 pb-6">
+                  <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><Archive size={24} /></div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-800">تفضيلات محرك الأرشفة</h3>
+                    <p className="text-xs font-bold text-slate-400 mt-1">تتحكم هذه الإعدادات في كيفية معالجة الذكاء الاصطناعي للمستندات.</p>
+                  </div>
+               </div>
+
+               <div className="space-y-6">
+                  {[
+                    { 
+                      id: 'auto-open', 
+                      label: 'فتح المستندات تلقائياً', 
+                      desc: 'فتح ملف الكتاب بمجرد الضغط على معاينة في الأرشيف.', 
+                      val: autoOpenFiles, 
+                      setter: setAutoOpenFiles 
+                    },
+                    { 
+                      id: 'ai-summary', 
+                      label: 'التلخيص الذكي للكتب', 
+                      desc: 'توليد خلاصة نصية لمحتوى الكتاب فور رفعه باستخدام Gemini.', 
+                      val: true, 
+                      disabled: true 
+                    },
+                    { 
+                      id: 'ocr-extract', 
+                      label: 'التعرف الضوئي (OCR)', 
+                      desc: 'استخراج التواريخ والأرقام تلقائياً من الصور الممسوحة.', 
+                      val: true, 
+                      disabled: true 
+                    }
+                  ].map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-6 bg-slate-50/50 rounded-2xl border border-slate-100 group">
+                       <div className="flex-1 text-right">
+                          <h4 className="text-sm font-black text-slate-800">{item.label}</h4>
+                          <p className="text-[11px] font-bold text-slate-400 mt-1 leading-relaxed">{item.desc}</p>
+                       </div>
+                       <button 
+                        onClick={() => !item.disabled && item.setter?.(!item.val)}
+                        className={`w-14 h-8 rounded-full transition-all relative shrink-0 ${item.val ? 'bg-emerald-600 shadow-lg shadow-emerald-100' : 'bg-slate-200'} ${item.disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                       >
+                         <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${item.val ? 'right-7' : 'right-1'}`}></div>
+                       </button>
+                    </div>
+                  ))}
+               </div>
+
+               <div className="p-6 bg-amber-50/50 border border-amber-100 rounded-2xl flex items-start gap-4">
+                  <ShieldAlert className="text-amber-500 shrink-0" size={20} />
+                  <p className="text-[10px] font-bold text-amber-700 leading-relaxed">ملاحظة: تفعيل "التلخيص الذكي" و "OCR" يتطلب مفتاح API نشطاً ومستوى صلاحيات (مشرف) للتحكم في استهلاك الوحدات المتاحة.</p>
+               </div>
+            </div>
+          )}
+
+          {activeTab === 'trash' && (
+            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+               <div className="flex items-center gap-4 mb-8">
+                  <div className="p-3 bg-red-50 text-red-500 rounded-2xl"><Trash2 size={24} /></div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-800">سجل المحذوفات</h3>
+                    <p className="text-xs font-bold text-slate-400 mt-1">إدارة الوثائق والأضابير التي تم حذفها مؤخراً.</p>
+                  </div>
+               </div>
+               <TrashBin 
+                  deletedDocs={deletedDocs} 
+                  deletedFolders={deletedFolders} 
+                  onRestoreDoc={onRestoreDoc} 
+                  onRestoreFolder={onRestoreFolder} 
+               />
             </div>
           )}
         </div>
