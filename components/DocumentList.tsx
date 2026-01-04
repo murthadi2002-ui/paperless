@@ -17,15 +17,18 @@ interface DocumentListProps {
   onRenameFolder?: (id: string, name: string) => void;
   onDuplicateDoc?: (doc: Document) => void;
   onTogglePin?: (id: string) => void;
+  selectedProjectId: string;
+  setSelectedProjectId: (id: string) => void;
+  activeFolderId: string | null;
+  setActiveFolderId: (id: string | null) => void;
 }
 
 const DocumentList: React.FC<DocumentListProps> = ({ 
   documents, folders, projects, onAddFolder, onOpenUnit, onDeleteDoc, onDeleteFolder,
-  onRenameDoc, onRenameFolder, onDuplicateDoc, onTogglePin
+  onRenameDoc, onRenameFolder, onDuplicateDoc, onTogglePin,
+  selectedProjectId, setSelectedProjectId, activeFolderId, setActiveFolderId
 }) => {
   const [viewMode, setViewMode] = useState<'types' | 'folders' | 'pinned'>('types');
-  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);

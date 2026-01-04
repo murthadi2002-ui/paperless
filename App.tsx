@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   collection, onSnapshot, addDoc, updateDoc, 
   deleteDoc, doc, query, orderBy, where, 
@@ -51,46 +51,48 @@ const App: React.FC = () => {
   const [employees, setEmployees] = useState<User[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
   
+  // حالة المشروع المختار حالياً في فلتر الأرشيف
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
+
   const [currentDocument, setCurrentDocument] = useState<Document | null>(null);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'doc' | 'folder' | 'attachment' | 'project', parentId?: string } | null>(null);
 
-  // --- Real-time Firestore Listeners with Error Handling ---
+  // تحديث المشروع المختار تلقائياً ليكون الأحدث عند تحميل البيانات
+  useEffect(() => {
+    if (projects.length > 0 && selectedProjectId === 'all') {
+      const latest = [...projects].sort((a, b) => 
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      )[0];
+      if (latest) setSelectedProjectId(latest.id);
+    }
+  }, [projects]);
+
   useEffect(() => {
     if (!currentOrg) return;
-
-    const handleError = (err: any) => {
-      console.error("Firestore Error:", err);
-      if (err.code === 'permission-denied') {
-        setDbError("يجب تفعيل Security Rules من لوحة تحكم Firebase (Rules > allow read, write: if true)");
-      }
-    };
+    const handleError = (err: any) => console.error("Firestore Error:", err);
 
     const unsubDocs = onSnapshot(query(collection(db, "documents"), orderBy("date", "desc")), 
-      (snapshot) => { setDocuments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Document))); setDbError(null); },
+      (snapshot) => setDocuments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Document))),
       handleError
     );
-
     const unsubFolders = onSnapshot(collection(db, "folders"), 
       (snapshot) => setFolders(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Folder))),
       handleError
     );
-
     const unsubProjects = onSnapshot(collection(db, "projects"), 
       (snapshot) => setProjects(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Project))),
       handleError
     );
-
     const unsubUsers = onSnapshot(collection(db, "users"), 
       (snapshot) => setEmployees(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as User))),
       handleError
     );
-
     const unsubDepts = onSnapshot(collection(db, "departments"), 
       (snapshot) => setDepartments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Department))),
       handleError
     );
-
     const unsubPos = onSnapshot(collection(db, "positions"), 
       (snapshot) => setPositions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Position))),
       handleError
@@ -101,24 +103,29 @@ const App: React.FC = () => {
     };
   }, [currentOrg]);
 
-  // --- Firestore Handlers ---
   const handleAddDocument = async (newDoc: any) => {
     const { id, ...docData } = newDoc;
-    // تنظيف البيانات من أي قيم undefined قبل الإرسال لـ Firebase
     const cleanData = JSON.parse(JSON.stringify(docData));
     await addDoc(collection(db, "documents"), { ...cleanData, createdAt: serverTimestamp() });
   };
 
   const handleAddFolder = async (folder: any) => {
     const { id, ...data } = folder;
-    const cleanData = JSON.parse(JSON.stringify(data));
+    // التأكد من ربط الإضبارة بالمشروع المختار حالياً
+    const folderData = { 
+      ...data, 
+      projectId: selectedProjectId !== 'all' ? selectedProjectId : (data.projectId || null) 
+    };
+    const cleanData = JSON.parse(JSON.stringify(folderData));
     await addDoc(collection(db, "folders"), { ...cleanData, createdAt: serverTimestamp() });
   };
 
   const handleAddProject = async (project: any) => {
     const { id, ...data } = project;
     const cleanData = JSON.parse(JSON.stringify(data));
-    await addDoc(collection(db, "projects"), { ...cleanData, createdAt: serverTimestamp() });
+    const docRef = await addDoc(collection(db, "projects"), { ...cleanData, createdAt: serverTimestamp() });
+    // جعل المشروع الجديد هو المختار تلقائياً
+    setSelectedProjectId(docRef.id);
   };
 
   const handleInviteEmployee = async (user: User) => {
@@ -214,6 +221,10 @@ const App: React.FC = () => {
               const d = documents.find(doc => doc.id === id);
               if(d) await updateDoc(doc(db, "documents", id), { isPinned: !d.isPinned });
             }}
+            selectedProjectId={selectedProjectId}
+            setSelectedProjectId={setSelectedProjectId}
+            activeFolderId={activeFolderId}
+            setActiveFolderId={setActiveFolderId}
           />
         );
       case 'my-tasks': return <EmployeePortal documents={activeDocs} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
@@ -290,6 +301,8 @@ const App: React.FC = () => {
         onAdd={handleAddDocument} 
         folders={folders} 
         projects={projects}
+        defaultProjectId={selectedProjectId}
+        defaultFolderId={activeFolderId}
       />
       <CreateProjectModal isOpen={isAddProjectModalOpen} onClose={()=>setIsAddProjectModalOpen(false)} onSave={handleAddProject} />
 
