@@ -259,6 +259,7 @@ const App: React.FC = () => {
           folders={activeFolders} 
           projects={projects} 
           onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); setActiveTab('documents'); }}
+          onAddDocument={handleAddDocument}
         />
       );
       case 'projects':
