@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
-  LayoutDashboard, FileText, Briefcase, Users, Bell, Settings, PlusCircle, LogOut, ChevronLeft, ChevronRight, MessageSquare, ClipboardList, Building2
+  LayoutDashboard, FileText, Briefcase, Users, Settings, PlusCircle, LogOut, ChevronLeft, ChevronRight, MessageSquare, ClipboardList
 } from 'lucide-react';
-import { CURRENT_USER } from '../constants';
+import { User } from '../types';
 import ConfirmModal from './ConfirmModal';
 
 interface LayoutProps {
@@ -13,6 +12,7 @@ interface LayoutProps {
   onAddClick?: () => void;
   onLogout?: () => void;
   organizationName?: string;
+  currentUser: User | null;
 }
 
 const LogoP = ({ size = 22 }: { size?: number }) => (
@@ -24,17 +24,13 @@ const LogoP = ({ size = 22 }: { size?: number }) => (
   </div>
 );
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAddClick, onLogout, organizationName }) => {
-  // يبدأ مصغراً إذا كانت الشاشة أصغر من الكمبيوتر (lg: 1024px)
+const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAddClick, onLogout, organizationName, currentUser }) => {
   const [isCollapsed, setIsCollapsed] = useState(window.innerWidth < 1024);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  // مراقبة تغيير حجم الشاشة لضمان حالة التصغير في الآيباد
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 1024) {
-        setIsCollapsed(true);
-      }
+      if (window.innerWidth < 1024) setIsCollapsed(true);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -46,9 +42,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAd
     { id: 'projects', label: 'المشاريع الهندسية', icon: Briefcase },
     { id: 'my-tasks', label: 'مهامي وتوجيهاتي', icon: ClipboardList },
     { id: 'messages', label: 'المراسلات الداخلية', icon: MessageSquare },
-    { id: 'invites', label: 'إدارة الكوادر', icon: Users },
+    { id: 'invites', label: 'إدارة الكوادر', icon: Users, adminOnly: true },
     { id: 'settings', label: 'الإعدادات والنظام', icon: Settings },
   ];
+
+  const filteredMenu = menuItems.filter(item => !item.adminOnly || currentUser?.role === 'admin');
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-cairo transition-all duration-300 text-right" dir="rtl">
@@ -67,10 +65,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAd
         onCancel={() => setShowLogoutConfirm(false)}
       />
 
-      {/* Sidebar */}
       <aside className={`${isCollapsed ? 'w-16' : 'lg:w-52 w-16'} bg-white border-l border-slate-200/60 flex flex-col transition-all duration-300 z-40 relative shadow-xl shadow-slate-200/30`}>
-        
-        {/* زر التحكم: يظهر فقط في شاشات الكمبيوتر (lg) ويختفي في الآيباد والأصغر */}
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)} 
           className="hidden lg:flex absolute -left-3 top-10 w-6 h-10 bg-white border border-slate-200 rounded-full items-center justify-center text-slate-400 hover:text-emerald-600 shadow-sm z-50 transition-all hover:bg-emerald-50"
@@ -84,7 +79,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAd
         </div>
 
         <nav className="flex-1 mt-2 px-2 space-y-1 overflow-y-auto no-scrollbar">
-          {menuItems.map((item) => {
+          {filteredMenu.map((item) => {
             const Icon = item.icon;
             return (
               <button
@@ -105,11 +100,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAd
 
         <div className="p-2 border-t border-slate-100">
           <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'lg:gap-2.5 lg:p-2.5 lg:bg-slate-50 justify-center lg:justify-start'} rounded-xl transition-all`}>
-            <img src={CURRENT_USER.avatar} alt="User" className="w-8 h-8 rounded-lg border-2 border-white shadow-sm shrink-0 object-cover" />
+            <img src={currentUser?.avatar || 'https://i.pravatar.cc/150'} alt="User" className="w-8 h-8 rounded-lg border-2 border-white shadow-sm shrink-0 object-cover" />
             {!isCollapsed && (
               <>
                 <div className="hidden lg:block flex-1 overflow-hidden text-right">
-                  <p className="text-[9px] font-black text-slate-800 truncate leading-none">{CURRENT_USER.name}</p>
+                  <p className="text-[9px] font-black text-slate-800 truncate leading-none">{currentUser?.name || 'مستخدم'}</p>
                   <p className="text-[8px] font-bold text-slate-400 truncate mt-1">{organizationName}</p>
                 </div>
                 <button onClick={() => setShowLogoutConfirm(true)} className="hidden lg:block text-slate-300 hover:text-red-500 transition-colors shrink-0" title="تسجيل الخروج">

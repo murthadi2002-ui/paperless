@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo } from 'react';
 import { 
   ChevronRight, Calendar, Hash, User, Building2, Tag, 
@@ -319,7 +318,8 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
               <div className="p-6 space-y-4">
                  <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mr-1">المكلفون</label>
-                    <select multiple className="w-full h-32 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-xs" value={taskData.assigneeIds} onChange={(e) => setTaskData({...taskData, assigneeIds: Array.from(e.target.selectedOptions, o => o.value)})}>
+                    {/* Fixed TypeScript error by adding explicit type casting to the map function in Array.from */}
+                    <select multiple className="w-full h-32 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-xs" value={taskData.assigneeIds} onChange={(e) => setTaskData({...taskData, assigneeIds: Array.from(e.target.selectedOptions, (o: HTMLOptionElement) => o.value)})}>
                       {MOCK_EMPLOYEES.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
                     </select>
                  </div>
