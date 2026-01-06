@@ -1,24 +1,25 @@
 
 import React, { useState } from 'react';
 import { Search, Plus, Briefcase, FileText, ChevronLeft, MoreVertical, LayoutGrid, List, Trash2, Edit3 } from 'lucide-react';
-import { Project, Document } from '../types';
-import { CURRENT_USER } from '../constants';
+import { Project, Document, User } from '../types';
 
 interface ProjectListProps {
   projects: Project[];
   documents: Document[];
+  currentUser: User | null;
   onSelectProject: (project: Project) => void;
   onAddProject: () => void;
   onDeleteProject?: (id: string) => void;
   onRenameProject?: (id: string, oldName: string) => void;
 }
 
-const ProjectList: React.FC<ProjectListProps> = ({ projects, documents, onSelectProject, onAddProject, onDeleteProject, onRenameProject }) => {
+const ProjectList: React.FC<ProjectListProps> = ({ projects, documents, currentUser, onSelectProject, onAddProject, onDeleteProject, onRenameProject }) => {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
-  const canEdit = CURRENT_USER.role === 'admin' || CURRENT_USER.permissions?.includes('تعديل مشروع') || CURRENT_USER.permissions?.includes('إدارة المشاريع');
-  const canDelete = CURRENT_USER.role === 'admin' || CURRENT_USER.permissions?.includes('حذف مشروع') || CURRENT_USER.permissions?.includes('إدارة المشاريع');
+  // Use currentUser from props instead of the missing constant
+  const canEdit = currentUser?.role === 'admin' || currentUser?.permissions?.includes('تعديل مشروع') || currentUser?.permissions?.includes('إدارة المشاريع');
+  const canDelete = currentUser?.role === 'admin' || currentUser?.permissions?.includes('حذف مشروع') || currentUser?.permissions?.includes('إدارة المشاريع');
 
   const filteredProjects = projects.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 

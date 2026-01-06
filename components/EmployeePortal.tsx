@@ -2,37 +2,40 @@
 import React, { useState } from 'react';
 import { 
   ClipboardList, Clock, CheckCircle2, AlertCircle, 
-  ChevronLeft, FileText, Send, User, Calendar,
+  ChevronLeft, FileText, Send, User as UserIcon, Calendar,
   ArrowUpRight, MessageSquare, Briefcase, Reply,
   UserCheck, History, Check, X, Users, UserPlus,
   ArrowLeft, ArrowRightLeft, SendHorizontal
 } from 'lucide-react';
-import { Document, WorkflowTask } from '../types';
-import { CURRENT_USER, MOCK_EMPLOYEES } from '../constants';
+import { Document, WorkflowTask, User } from '../types';
 
 interface EmployeePortalProps {
   documents: Document[];
+  currentUser: User | null;
+  employees: User[];
   onOpenDoc: (doc: Document) => void;
 }
 
-const EmployeePortal: React.FC<EmployeePortalProps> = ({ documents, onOpenDoc }) => {
+const EmployeePortal: React.FC<EmployeePortalProps> = ({ documents, currentUser, employees, onOpenDoc }) => {
   const [activeTab, setActiveTab] = useState<'incoming' | 'outgoing' | 'completed'>('incoming');
   const [selectedTask, setSelectedTask] = useState<{doc: Document, task: WorkflowTask} | null>(null);
   const [response, setResponse] = useState('');
 
   // Filtering Logic
+  if (!currentUser) return null;
+
   const allPortalTasks = documents.flatMap(doc => 
     (doc.tasks || []).map(task => ({ doc, task }))
   );
 
   const filteredTasks = allPortalTasks.filter(({ task }) => {
     if (activeTab === 'incoming') {
-      return task.assigneeIds.includes(CURRENT_USER.id) && task.status !== 'completed';
+      return task.assigneeIds.includes(currentUser.id) && task.status !== 'completed';
     } else if (activeTab === 'outgoing') {
-      return task.issuerId === CURRENT_USER.id && task.status !== 'completed';
+      return task.issuerId === currentUser.id && task.status !== 'completed';
     } else {
       // Completed tasks where user is either issuer or assignee
-      return (task.assigneeIds.includes(CURRENT_USER.id) || task.issuerId === CURRENT_USER.id) && task.status === 'completed';
+      return (task.assigneeIds.includes(currentUser.id) || task.issuerId === currentUser.id) && task.status === 'completed';
     }
   });
 
@@ -59,9 +62,10 @@ const EmployeePortal: React.FC<EmployeePortalProps> = ({ documents, onOpenDoc })
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
         {filteredTasks.length > 0 ? (
           filteredTasks.map(({ doc, task }) => {
-            const issuer = MOCK_EMPLOYEES.find(e => e.id === task.issuerId) || CURRENT_USER;
-            const assignees = MOCK_EMPLOYEES.filter(e => task.assigneeIds.includes(e.id));
-            const isMyOutgoing = task.issuerId === CURRENT_USER.id;
+            // Use employees list from props instead of mock constants
+            const issuer = employees.find(e => e.id === task.issuerId) || currentUser;
+            const assignees = employees.filter(e => task.assigneeIds.includes(e.id));
+            const isMyOutgoing = task.issuerId === currentUser.id;
 
             return (
               <div key={task.id} onClick={() => setSelectedTask({doc, task})} className={`bg-white p-6 rounded-2xl border transition-all group cursor-pointer overflow-hidden flex flex-col relative ${selectedTask?.task.id === task.id ? 'ring-4 ring-emerald-500/10 border-emerald-500 shadow-xl' : 'border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1'}`}>
@@ -94,7 +98,7 @@ const EmployeePortal: React.FC<EmployeePortalProps> = ({ documents, onOpenDoc })
                        )}
                      </div>
                      <span className="text-[10px] font-black text-amber-700">
-                        {assignees.find(a => a.id === CURRENT_USER.id) ? 'أنت' : assignees[0]?.name.split(' ')[0]} 
+                        {assignees.find(a => a.id === currentUser.id) ? 'أنت' : assignees[0]?.name.split(' ')[0]} 
                         {assignees.length > 1 ? ` +${assignees.length - 1}` : ''}
                      </span>
                    </div>
@@ -186,10 +190,10 @@ const EmployeePortal: React.FC<EmployeePortalProps> = ({ documents, onOpenDoc })
                           <div className="flex items-center gap-4 bg-white px-5 py-3 rounded-full border border-indigo-100 shadow-md ring-4 ring-indigo-50/50">
                              <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
                              <span className="text-[9px] font-black text-indigo-400 uppercase">المُوجّه:</span>
-                             <img src={MOCK_EMPLOYEES.find(e => e.id === selectedTask.task.issuerId)?.avatar || CURRENT_USER.avatar} className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm" alt="" />
+                             <img src={employees.find(e => e.id === selectedTask.task.issuerId)?.avatar || currentUser.avatar} className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm" alt="" />
                              <div className="text-right">
-                                <p className="text-xs font-black text-slate-800 leading-none">{MOCK_EMPLOYEES.find(e => e.id === selectedTask.task.issuerId)?.name || CURRENT_USER.name}</p>
-                                <p className="text-[9px] font-bold text-slate-400 mt-1">{MOCK_EMPLOYEES.find(e => e.id === selectedTask.task.issuerId)?.department || CURRENT_USER.department}</p>
+                                <p className="text-xs font-black text-slate-800 leading-none">{employees.find(e => e.id === selectedTask.task.issuerId)?.name || currentUser.name}</p>
+                                <p className="text-[9px] font-bold text-slate-400 mt-1">{employees.find(e => e.id === selectedTask.task.issuerId)?.department || currentUser.department}</p>
                              </div>
                           </div>
                        </div>
@@ -199,11 +203,11 @@ const EmployeePortal: React.FC<EmployeePortalProps> = ({ documents, onOpenDoc })
                              <span className="text-[9px] font-black text-amber-500 bg-amber-50 px-2.5 py-1 rounded-md uppercase border border-amber-100 shadow-sm">المكلفون بالمتابعة</span>
                           </div>
                           <div className="flex flex-wrap gap-2.5">
-                             {MOCK_EMPLOYEES.filter(e => selectedTask.task.assigneeIds.includes(e.id)).map(a => (
-                               <div key={a.id} className={`flex items-center gap-2.5 px-3.5 py-2 rounded-full border shadow-sm transition-all ${a.id === CURRENT_USER.id ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-100 text-slate-600 hover:border-emerald-200'}`}>
+                             {employees.filter(e => selectedTask.task.assigneeIds.includes(e.id)).map(a => (
+                               <div key={a.id} className={`flex items-center gap-2.5 px-3.5 py-2 rounded-full border shadow-sm transition-all ${a.id === currentUser.id ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-100 text-slate-600 hover:border-emerald-200'}`}>
                                   <img src={a.avatar} className="w-7 h-7 rounded-full object-cover border-2 border-white" alt="" />
                                   <span className="text-[11px] font-black pr-1">{a.name}</span>
-                                  {a.id === CURRENT_USER.id && <span className="text-[7px] font-black bg-white/20 px-2 py-0.5 rounded-full mr-1">أنت</span>}
+                                  {a.id === currentUser.id && <span className="text-[7px] font-black bg-white/20 px-2 py-0.5 rounded-full mr-1">أنت</span>}
                                </div>
                              ))}
                           </div>
@@ -229,7 +233,7 @@ const EmployeePortal: React.FC<EmployeePortalProps> = ({ documents, onOpenDoc })
                  {/* Interface based on role & status */}
                  {selectedTask.task.status === 'pending' ? (
                    <div className="space-y-4 pt-4">
-                      {selectedTask.task.issuerId === CURRENT_USER.id ? (
+                      {selectedTask.task.issuerId === currentUser.id ? (
                         <div className="p-8 bg-indigo-50 border border-indigo-100 rounded-2xl flex flex-col items-center text-center gap-4">
                            <div className="p-4 bg-white rounded-2xl shadow-lg text-indigo-400 ring-8 ring-indigo-50">
                              <Clock size={40} />
@@ -264,7 +268,7 @@ const EmployeePortal: React.FC<EmployeePortalProps> = ({ documents, onOpenDoc })
                         <p className="text-xs font-bold text-emerald-900 leading-relaxed italic">"تمت مراجعة الكتاب وإبداء الرأي الفني، المرفقات سليمة ومطابقة للمواصفات المطلوبة."</p>
                         <div className="mt-6 flex items-center justify-between text-[9px] font-black text-emerald-600/60 uppercase tracking-widest">
                            <span>تاريخ الاعتماد: 2024-05-10</span>
-                           <span className="flex items-center gap-1">الموظف المسؤول: {MOCK_EMPLOYEES.find(e => selectedTask.task.assigneeIds.includes(e.id))?.name}</span>
+                           <span className="flex items-center gap-1">الموظف المسؤول: {employees.find(e => selectedTask.task.assigneeIds.includes(e.id))?.name}</span>
                         </div>
                       </div>
                    </div>

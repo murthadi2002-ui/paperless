@@ -1,9 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { 
-  collection, onSnapshot, addDoc, updateDoc, 
-  deleteDoc, doc as firestoreDoc, query, orderBy, where, 
-  setDoc, getDoc, serverTimestamp 
-} from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc as firestoreDoc, query, orderBy, where, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { Loader2 } from 'lucide-react';
 import { db, auth } from './firebase';
@@ -164,17 +161,15 @@ const App: React.FC = () => {
             onOpenUnit={(d) => { setCurrentDocument(d); setActiveView('details'); }}
             onDeleteDoc={(id) => setConfirmDelete({ id, type: 'doc' })}
             onDeleteFolder={(id) => setConfirmDelete({ id, type: 'folder' })}
-            onTogglePin={async (id) => {
-              const d = documents.find(doc => doc.id === id);
-              if(d) await updateDoc(firestoreDoc(db, "documents", id), { isPinned: !d.isPinned });
-            }}
             selectedProjectId={selectedProjectId}
             setSelectedProjectId={setSelectedProjectId}
             activeFolderId={activeFolderId}
             setActiveFolderId={setActiveFolderId}
+            currentUser={currentUser}
           />
         );
-      case 'my-tasks': return <EmployeePortal documents={activeDocs} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} currentUser={currentUser} employees={employees} />;
+      // Pass currentUser and employees to EmployeePortal
+      case 'my-tasks': return <EmployeePortal documents={activeDocs} currentUser={currentUser} employees={employees} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
       case 'messages': return (
         <MessagingPage 
           documents={activeDocs} folders={activeFolders} projects={projects} 
@@ -186,9 +181,10 @@ const App: React.FC = () => {
       );
       case 'projects':
         if (activeProjectView === 'details' && currentProject) return <ProjectDetailsView project={currentProject} documents={activeDocs} folders={activeFolders} onBack={()=>{setActiveProjectView('list');setCurrentProject(null)}} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
+        // Pass currentUser to ProjectList
         return (
           <ProjectList 
-            projects={projects} documents={activeDocs} 
+            projects={projects} documents={activeDocs} currentUser={currentUser}
             onSelectProject={(p)=>{setCurrentProject(p);setActiveProjectView('details')}} 
             onAddProject={()=>setIsAddProjectModalOpen(true)}
             onDeleteProject={(id) => setConfirmDelete({ id, type: 'project' })}
@@ -210,10 +206,11 @@ const App: React.FC = () => {
             autoOpenFiles={autoOpenFiles} setAutoOpenFiles={setAutoOpenFiles} 
             onRestoreDoc={async (docObj)=> await updateDoc(firestoreDoc(db, "documents", docObj.id), { deletedAt: null })} 
             onRestoreFolder={async (fObj)=> await updateDoc(firestoreDoc(db, "folders", fObj.id), { deletedAt: null })} 
-            departments={departments} currentUser={currentUser}
+            departments={departments}
             onAddDept={async (name) => await addDoc(collection(db, "departments"), { name, employeeCount: 0 })}
             onDeleteDepartment={async (id) => await deleteDoc(firestoreDoc(db, "departments", id))} 
             onLogout={handleLogout}
+            currentUser={currentUser}
           />
         );
       default: return <Dashboard documents={activeDocs} />;
@@ -246,7 +243,7 @@ const App: React.FC = () => {
       <ConfirmModal 
         isOpen={!!confirmDelete} 
         title="حذف العنصر"
-        message="هل أنت متأكد؟ سيتم نقل العنصر لسلة المهملات."
+        message="هل أنت متأكد؟"
         confirmLabel="نعم، حذف" cancelLabel="إلغاء"
         onConfirm={async () => {
           if (!confirmDelete) return;
