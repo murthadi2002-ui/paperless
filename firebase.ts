@@ -1,13 +1,8 @@
 
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
-/**
- * تعليمات للمستخدم:
- * 1. اذهب إلى Firebase Console > Project Settings.
- * 2. انسخ كود firebaseConfig.
- * 3. استبدل القيم أدناه بالقيم الحقيقية التي حصلت عليها.
- */
 const firebaseConfig = {
   apiKey: "AIzaSyCq8TVGkTVCMTa4o9AM3x9LhLWqWEwMWUw",
   authDomain: "paperless-12a1b.firebaseapp.com",
@@ -18,8 +13,7 @@ const firebaseConfig = {
   measurementId: "G-2TH70QV2KR"
 };
 
-// تهيئة التطبيق
 const app = initializeApp(firebaseConfig);
-
-// تصدير قاعدة البيانات لاستخدامها في باقي الصفحات
 export const db = getFirestore(app);
+export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();

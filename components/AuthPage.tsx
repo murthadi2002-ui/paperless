@@ -1,13 +1,25 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signInWithPopup, 
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  onAuthStateChanged,
+  updateProfile
+} from 'firebase/auth';
+import { 
+  doc, setDoc, getDoc, collection, query, where, getDocs, serverTimestamp 
+} from 'firebase/firestore';
+import { auth, db, googleProvider } from '../firebase';
 import { 
   Building, UserPlus, LogIn, ShieldCheck, 
   ArrowLeft, ArrowRight, Mail, Lock, 
   User as UserIcon, Globe, 
   CheckCircle2, Sparkles, PlusCircle,
   Chrome, Send, KeyRound, AlertCircle, Loader2,
-  // Added missing Clock import
-  Clock
+  Clock, ShieldAlert, CheckCircle, RefreshCw
 } from 'lucide-react';
 import { User, Organization } from '../types';
 
@@ -26,8 +38,9 @@ const LogoP = ({ size = 28 }: { size?: number }) => (
 
 const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'forgot'>('login');
-  const [flowStep, setFlowStep] = useState<'auth' | 'onboarding' | 'create-org' | 'join-org' | 'pending'>('auth');
+  const [flowStep, setFlowStep] = useState<'auth' | 'verify' | 'onboarding' | 'create-org' | 'join-org' | 'pending'>('auth');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Form States
   const [email, setEmail] = useState('');
@@ -36,61 +49,161 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
   const [orgName, setOrgName] = useState('');
   const [orgCode, setOrgCode] = useState('');
 
-  const handleAuthAction = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    // محاكاة الاتصال بـ Firebase Auth
-    setTimeout(() => {
-      setLoading(false);
-      if (authMode === 'login') {
-        // إذا كان مستخدماً سابقاً يدخل مباشرة (محاكاة)
-        // إذا كان أول مرة، ننتقل للـ Onboarding
-        setFlowStep('onboarding');
-      } else {
-        setFlowStep('onboarding');
+  // المراقب التلقائي للمستخدم
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        if (!firebaseUser.emailVerified && authMode === 'register') {
+          setFlowStep('verify');
+          return;
+        }
+        
+        // جلب بيانات المستخدم من Firestore
+        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as User;
+          if (userData.organizationId) {
+            const orgDoc = await getDoc(doc(db, "organizations", userData.organizationId));
+            if (orgDoc.exists()) {
+              onLogin(userData, orgDoc.data() as Organization);
+            }
+          } else {
+            setFlowStep('onboarding');
+          }
+        } else {
+          setFlowStep('onboarding');
+        }
       }
-    }, 1200);
-  };
+    });
+    return unsubscribe;
+  }, []);
 
-  const handleGoogleLogin = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setFlowStep('onboarding');
-    }, 1000);
-  };
-
-  const finalizeCreateOrg = (e: React.FormEvent) => {
+  const handleAuthAction = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      const newOrg: Organization = {
-        id: 'org-' + Math.random().toString(36).substr(2, 5),
+    setError(null);
+    try {
+      if (authMode === 'register') {
+        const res = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(res.user, { displayName: name });
+        await sendEmailVerification(res.user);
+        
+        // إنشاء سجل مستخدم أولي
+        await setDoc(doc(db, "users", res.user.uid), {
+          id: res.user.uid,
+          name,
+          email,
+          avatar: `https://ui-avatars.com/api/?name=${name}&background=10b981&color=fff`,
+          role: 'employee',
+          organizationId: '',
+          status: 'pending',
+          joinedDate: new Date().toISOString().split('T')[0]
+        });
+        
+        setFlowStep('verify');
+      } else if (authMode === 'login') {
+        await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        await sendPasswordResetEmail(auth, email);
+        alert('تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني.');
+        setAuthMode('login');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    try {
+      const res = await signInWithPopup(auth, googleProvider);
+      const userDoc = await getDoc(doc(db, "users", res.user.uid));
+      if (!userDoc.exists()) {
+        await setDoc(doc(db, "users", res.user.uid), {
+          id: res.user.uid,
+          name: res.user.displayName,
+          email: res.user.email,
+          avatar: res.user.photoURL,
+          role: 'employee',
+          organizationId: '',
+          status: 'pending',
+          joinedDate: new Date().toISOString().split('T')[0]
+        });
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const finalizeCreateOrg = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!auth.currentUser) return;
+    setLoading(true);
+    try {
+      const orgId = 'org-' + Math.random().toString(36).substr(2, 5);
+      const orgData: Organization = {
+        id: orgId,
         name: orgName,
         code: 'PAPER-' + Math.random().toString(36).substr(2, 4).toUpperCase(),
-        ownerId: 'u-current',
+        ownerId: auth.currentUser.uid,
         createdAt: new Date().toISOString()
       };
-      const user: User = {
-        id: 'u-current',
-        name: name || 'مستخدم جديد',
-        email: email,
-        avatar: `https://i.pravatar.cc/150?u=${email}`,
+      
+      await setDoc(doc(db, "organizations", orgId), orgData);
+      await setDoc(doc(db, "users", auth.currentUser.uid), {
+        organizationId: orgId,
         role: 'admin',
-        organizationId: newOrg.id,
         status: 'active'
-      };
-      onLogin(user, newOrg);
-    }, 1500);
+      }, { merge: true });
+      
+      const updatedUser = (await getDoc(doc(db, "users", auth.currentUser.uid))).data() as User;
+      onLogin(updatedUser, orgData);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const finalizeJoinOrg = (e: React.FormEvent) => {
+  const finalizeJoinOrg = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!auth.currentUser) return;
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const q = query(collection(db, "organizations"), where("code", "==", orgCode));
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        throw new Error("رمز المنشأة غير صحيح.");
+      }
+      
+      const orgData = querySnapshot.docs[0].data() as Organization;
+      await setDoc(doc(db, "users", auth.currentUser.uid), {
+        organizationId: orgData.id,
+        status: 'pending' // بانتظار موافقة المدير
+      }, { merge: true });
+      
       setFlowStep('pending');
-    }, 1500);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkVerification = async () => {
+    setLoading(true);
+    await auth.currentUser?.reload();
+    if (auth.currentUser?.emailVerified) {
+      setFlowStep('onboarding');
+    } else {
+      setError("لم يتم التحقق من البريد بعد. يرجى الضغط على الرابط المرسل.");
+    }
+    setLoading(false);
   };
 
   const renderAuthForm = () => (
@@ -104,9 +217,17 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
         </p>
       </div>
 
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3 text-red-600 animate-in shake duration-300">
+          <AlertCircle size={18} className="shrink-0 mt-0.5" />
+          <p className="text-[10px] font-bold leading-relaxed">{error}</p>
+        </div>
+      )}
+
       <div className="space-y-4">
         <button 
           onClick={handleGoogleLogin}
+          type="button"
           className="w-full py-3.5 border border-slate-200 rounded-xl flex items-center justify-center gap-3 font-black text-xs text-slate-600 hover:bg-slate-50 transition-all active:scale-95"
         >
           <Chrome size={18} className="text-blue-500" />
@@ -177,35 +298,24 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
     </div>
   );
 
-  const renderOnboarding = () => (
-    <div className="flex flex-col md:flex-row gap-8 animate-in zoom-in-95 duration-500">
-      <button 
-        onClick={() => setFlowStep('create-org')}
-        className="group bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all text-right flex flex-col items-start gap-6 w-full max-w-xs"
-      >
-        <div className="p-5 rounded-2xl bg-emerald-50 text-emerald-600 group-hover:scale-110 transition-transform">
-          <PlusCircle size={32} />
-        </div>
-        <div>
-          <h3 className="text-lg font-black text-slate-800 mb-2">تأسيس منشأة جديدة</h3>
-          <p className="text-[10px] font-bold text-slate-400 leading-relaxed">كن مديراً لنظامك الخاص، أنشئ الأقسام وادعُ موظفيك للأرشفة.</p>
-        </div>
-        <ArrowLeft className="text-emerald-600 opacity-0 group-hover:opacity-100 transition-all" />
-      </button>
-
-      <button 
-        onClick={() => setFlowStep('join-org')}
-        className="group bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all text-right flex flex-col items-start gap-6 w-full max-w-xs"
-      >
-        <div className="p-5 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:scale-110 transition-transform">
-          <UserPlus size={32} />
-        </div>
-        <div>
-          <h3 className="text-lg font-black text-slate-800 mb-2">الانضمام لمنشأة</h3>
-          <p className="text-[10px] font-bold text-slate-400 leading-relaxed">لديك رمز دعوة؟ انضم لفريق عملك وابدأ أرشفة الوثائق الموكلة إليك.</p>
-        </div>
-        <ArrowLeft className="text-indigo-600 opacity-0 group-hover:opacity-100 transition-all" />
-      </button>
+  const renderVerifyStep = () => (
+    <div className="w-full max-w-md bg-white p-12 rounded-[2.5rem] border border-slate-100 shadow-2xl animate-in zoom-in-95 duration-500 text-center space-y-8">
+       <div className="w-24 h-24 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-inner ring-8 ring-emerald-50/50">
+          <Mail size={48} />
+       </div>
+       <div>
+          <h2 className="text-xl font-black text-slate-800">تحقق من بريدك الإلكتروني</h2>
+          <p className="text-[11px] font-bold text-slate-400 mt-4 leading-relaxed">لقد أرسلنا رابط تحقق إلى <span className="text-emerald-600">{email}</span>. يرجى الضغط على الرابط في الرسالة لتفعيل حسابك.</p>
+       </div>
+       <div className="space-y-3 pt-4 border-t border-slate-50">
+          <button onClick={checkVerification} disabled={loading} className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black text-sm shadow-xl flex items-center justify-center gap-2">
+            {loading ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle size={18} />}
+            لقد تم التحقق، أدخلني
+          </button>
+          <button onClick={() => auth.currentUser && sendEmailVerification(auth.currentUser)} className="w-full py-3 text-[10px] font-black text-slate-400 hover:text-emerald-600 flex items-center justify-center gap-2">
+            <RefreshCw size={14} /> إعادة إرسال الرابط
+          </button>
+       </div>
     </div>
   );
 
@@ -225,7 +335,39 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
 
       <div className="w-full max-w-4xl z-10 flex flex-col items-center">
         {flowStep === 'auth' && renderAuthForm()}
-        {flowStep === 'onboarding' && renderOnboarding()}
+        {flowStep === 'verify' && renderVerifyStep()}
+        
+        {flowStep === 'onboarding' && (
+          <div className="flex flex-col md:flex-row gap-8 animate-in zoom-in-95 duration-500">
+            <button 
+              onClick={() => setFlowStep('create-org')}
+              className="group bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all text-right flex flex-col items-start gap-6 w-full max-w-xs"
+            >
+              <div className="p-5 rounded-2xl bg-emerald-50 text-emerald-600 group-hover:scale-110 transition-transform">
+                <PlusCircle size={32} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800 mb-2">تأسيس منشأة جديدة</h3>
+                <p className="text-[10px] font-bold text-slate-400 leading-relaxed">كن مديراً لنظامك الخاص، أنشئ الأقسام وادعُ موظفيك للأرشفة.</p>
+              </div>
+              <ArrowLeft className="text-emerald-600 opacity-0 group-hover:opacity-100 transition-all" />
+            </button>
+
+            <button 
+              onClick={() => setFlowStep('join-org')}
+              className="group bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all text-right flex flex-col items-start gap-6 w-full max-w-xs"
+            >
+              <div className="p-5 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:scale-110 transition-transform">
+                <UserPlus size={32} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800 mb-2">الانضمام لمنشأة</h3>
+                <p className="text-[10px] font-bold text-slate-400 leading-relaxed">لديك رمز دعوة؟ انضم لفريق عملك وابدأ أرشفة الوثائق الموكلة إليك.</p>
+              </div>
+              <ArrowLeft className="text-indigo-600 opacity-0 group-hover:opacity-100 transition-all" />
+            </button>
+          </div>
+        )}
         
         {flowStep === 'create-org' && (
           <div className="w-full max-w-md bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-2xl animate-in slide-in-from-bottom-8 relative overflow-hidden">
@@ -279,7 +421,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
                 <p className="text-[11px] font-bold text-slate-400 mt-4 leading-relaxed">لقد تم إرسال طلب الانضمام لمدير المنشأة بنجاح. يرجى التواصل معه لقبول طلبك لتتمكن من الوصول إلى الأرشيف.</p>
              </div>
              <div className="pt-4 border-t border-slate-50">
-                <button onClick={() => setFlowStep('auth')} className="text-xs font-black text-slate-400 hover:text-emerald-600 transition-colors">تسجيل الخروج والعودة</button>
+                <button onClick={() => { auth.signOut(); setFlowStep('auth'); }} className="text-xs font-black text-slate-400 hover:text-emerald-600 transition-colors">تسجيل الخروج والعودة</button>
              </div>
           </div>
         )}

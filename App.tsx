@@ -2,10 +2,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   collection, onSnapshot, addDoc, updateDoc, 
-  deleteDoc, doc, query, orderBy, where, 
+  deleteDoc, doc as firestoreDoc, query, orderBy, where, 
   setDoc, getDoc, serverTimestamp, writeBatch
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+// Import Loader2 from lucide-react
+import { Loader2 } from 'lucide-react';
+import { db, auth } from './firebase';
 
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
@@ -22,18 +25,12 @@ import EmployeePortal from './components/EmployeePortal';
 import ConfirmModal from './components/ConfirmModal';
 import AuthPage from './components/AuthPage';
 
-import { CURRENT_USER } from './constants';
 import { Document, Folder, Project, Department, User, Organization, Position, WorkflowTask, DocStatus, Attachment } from './types';
 
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(CURRENT_USER);
-  const [currentOrg, setCurrentOrg] = useState<Organization | null>({
-    id: 'org-1',
-    name: 'منشأة تجريبية',
-    code: 'PAPER-7X9Y',
-    ownerId: 'u1',
-    createdAt: new Date().toISOString()
-  });
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentOrg, setCurrentOrg] = useState<Organization | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeView, setActiveView] = useState<'list' | 'details'>('list');
@@ -42,7 +39,6 @@ const App: React.FC = () => {
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
   const [prefilledAttachments, setPrefilledAttachments] = useState<Attachment[]>([]);
   const [userRoleView, setUserRoleView] = useState<'admin' | 'employee'>('admin'); 
-  const [dbError, setDbError] = useState<string | null>(null);
   
   const [autoOpenFiles, setAutoOpenFiles] = useState(true);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -59,39 +55,68 @@ const App: React.FC = () => {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'doc' | 'folder' | 'attachment' | 'project', parentId?: string } | null>(null);
 
+  // إدارة حالة الجلسة الحقيقية
   useEffect(() => {
-    if (projects.length > 0 && selectedProjectId === 'all') {
-      const latest = [...projects].sort((a, b) => 
-        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-      )[0];
-      if (latest) setSelectedProjectId(latest.id);
-    }
-  }, [projects]);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setAuthLoading(true);
+      if (firebaseUser && firebaseUser.emailVerified) {
+        const userDoc = await getDoc(firestoreDoc(db, "users", firebaseUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as User;
+          if (userData.organizationId && userData.status === 'active') {
+            const orgDoc = await getDoc(firestoreDoc(db, "organizations", userData.organizationId));
+            if (orgDoc.exists()) {
+              setCurrentUser(userData);
+              setCurrentOrg(orgDoc.data() as Organization);
+              setUserRoleView(userData.role);
+            }
+          } else {
+            setCurrentUser(userData); // مستخدم بدون منشأة أو معلق
+          }
+        }
+      } else {
+        setCurrentUser(null);
+        setCurrentOrg(null);
+      }
+      setAuthLoading(false);
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     if (!currentOrg) return;
     const handleError = (err: any) => console.error("Firestore Error:", err);
 
-    const unsubDocs = onSnapshot(query(collection(db, "documents"), orderBy("date", "desc")), 
+    // ربط البيانات بالمنشأة الحالية فقط للأمان
+    const qDocs = query(collection(db, "documents"), where("organizationId", "==", currentOrg.id));
+    const unsubDocs = onSnapshot(qDocs, 
       (snapshot) => setDocuments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Document))),
       handleError
     );
-    const unsubFolders = onSnapshot(collection(db, "folders"), 
+    
+    const qFolders = query(collection(db, "folders"), where("organizationId", "==", currentOrg.id));
+    const unsubFolders = onSnapshot(qFolders, 
       (snapshot) => setFolders(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Folder))),
       handleError
     );
-    const unsubProjects = onSnapshot(collection(db, "projects"), 
+
+    const qProjects = query(collection(db, "projects"), where("organizationId", "==", currentOrg.id));
+    const unsubProjects = onSnapshot(qProjects, 
       (snapshot) => setProjects(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Project))),
       handleError
     );
-    const unsubUsers = onSnapshot(collection(db, "users"), 
+
+    const qUsers = query(collection(db, "users"), where("organizationId", "==", currentOrg.id));
+    const unsubUsers = onSnapshot(qUsers, 
       (snapshot) => setEmployees(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as User))),
       handleError
     );
+
     const unsubDepts = onSnapshot(collection(db, "departments"), 
       (snapshot) => setDepartments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Department))),
       handleError
     );
+    
     const unsubPos = onSnapshot(collection(db, "positions"), 
       (snapshot) => setPositions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Position))),
       handleError
@@ -102,21 +127,29 @@ const App: React.FC = () => {
     };
   }, [currentOrg]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOut(auth);
     setCurrentUser(null);
     setCurrentOrg(null);
   };
 
   const handleAddDocument = async (newDoc: any) => {
+    if (!currentOrg) return;
     const { id, ...docData } = newDoc;
     const cleanData = JSON.parse(JSON.stringify(docData));
-    await addDoc(collection(db, "documents"), { ...cleanData, createdAt: serverTimestamp() });
+    await addDoc(collection(db, "documents"), { 
+      ...cleanData, 
+      organizationId: currentOrg.id,
+      createdAt: serverTimestamp() 
+    });
   };
 
   const handleAddFolder = async (folder: any) => {
+    if (!currentOrg) return;
     const { id, ...data } = folder;
     const folderData = { 
       ...data, 
+      organizationId: currentOrg.id,
       projectId: selectedProjectId !== 'all' ? selectedProjectId : (data.projectId || null) 
     };
     const cleanData = JSON.parse(JSON.stringify(folderData));
@@ -124,39 +157,15 @@ const App: React.FC = () => {
   };
 
   const handleAddProject = async (project: any) => {
+    if (!currentOrg) return;
     const { id, ...data } = project;
     const cleanData = JSON.parse(JSON.stringify(data));
-    const docRef = await addDoc(collection(db, "projects"), { ...cleanData, createdAt: serverTimestamp() });
+    const docRef = await addDoc(collection(db, "projects"), { 
+      ...cleanData, 
+      organizationId: currentOrg.id,
+      createdAt: serverTimestamp() 
+    });
     setSelectedProjectId(docRef.id);
-  };
-
-  const handleOpenAddDocWithFiles = (files: Attachment[]) => {
-    setPrefilledAttachments(files);
-    setIsAddModalOpen(true);
-  };
-
-  const executeDelete = async () => {
-    if (!confirmDelete) return;
-    try {
-      if (confirmDelete.type === 'doc') {
-        await updateDoc(doc(db, "documents", confirmDelete.id), { deletedAt: new Date().toISOString() });
-        setActiveView('list');
-      } else if (confirmDelete.type === 'folder') {
-        await updateDoc(doc(db, "folders", confirmDelete.id), { deletedAt: new Date().toISOString() });
-      } else if (confirmDelete.type === 'project') {
-        await deleteDoc(doc(db, "projects", confirmDelete.id));
-        setActiveProjectView('list');
-      } else if (confirmDelete.type === 'attachment' && confirmDelete.parentId) {
-        const docRef = doc(db, "documents", confirmDelete.parentId);
-        const document = documents.find(d => d.id === confirmDelete.parentId);
-        if (document) {
-          await updateDoc(docRef, {
-            attachments: document.attachments.filter(a => a.id !== confirmDelete.id)
-          });
-        }
-      }
-    } catch (e) { console.error("Error:", e); }
-    setConfirmDelete(null);
   };
 
   const handleLogin = (user: User, org: Organization) => {
@@ -164,6 +173,19 @@ const App: React.FC = () => {
     setCurrentOrg(org);
     setUserRoleView(user.role);
   };
+
+  if (authLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-12 h-12 text-emerald-600 animate-spin mx-auto" />
+          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">تحميل الجلسة الآمنة...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser || !currentOrg) return <AuthPage onLogin={handleLogin} />;
 
   const renderContent = () => {
     const activeDocs = documents.filter(d => !d.deletedAt);
@@ -179,10 +201,10 @@ const App: React.FC = () => {
           autoOpenFiles={autoOpenFiles}
           onBack={() => { setActiveView('list'); setCurrentDocument(null); }} 
           onDelete={() => setConfirmDelete({ id: liveDoc.id, type: 'doc' })}
-          onUpdateSubject={(sub) => updateDoc(doc(db, "documents", liveDoc.id), { subject: sub })}
-          onAddAttachment={async (at) => await updateDoc(doc(db, "documents", liveDoc.id), { attachments: [...liveDoc.attachments, at] })}
+          onUpdateSubject={(sub) => updateDoc(firestoreDoc(db, "documents", liveDoc.id), { subject: sub })}
+          onAddAttachment={async (at) => await updateDoc(firestoreDoc(db, "documents", liveDoc.id), { attachments: [...liveDoc.attachments, at] })}
           onDeleteAttachment={(atId) => setConfirmDelete({ id: atId, type: 'attachment', parentId: liveDoc.id })}
-          onAddTask={(docId, task) => updateDoc(doc(db, "documents", docId), { tasks: [...(liveDoc.tasks || []), task], status: DocStatus.IN_PROGRESS })}
+          onAddTask={(docId, task) => updateDoc(firestoreDoc(db, "documents", docId), { tasks: [...(liveDoc.tasks || []), task], status: DocStatus.IN_PROGRESS })}
         />
       );
     }
@@ -199,7 +221,7 @@ const App: React.FC = () => {
             onDeleteFolder={(id) => setConfirmDelete({ id, type: 'folder' })}
             onTogglePin={async (id) => {
               const d = documents.find(doc => doc.id === id);
-              if(d) await updateDoc(doc(db, "documents", id), { isPinned: !d.isPinned });
+              if(d) await updateDoc(firestoreDoc(db, "documents", id), { isPinned: !d.isPinned });
             }}
             selectedProjectId={selectedProjectId}
             setSelectedProjectId={setSelectedProjectId}
@@ -215,7 +237,7 @@ const App: React.FC = () => {
           projects={projects} 
           onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); setActiveTab('documents'); }}
           onAddDocument={handleAddDocument}
-          onOpenAddModalWithFile={handleOpenAddDocWithFiles}
+          onOpenAddModalWithFile={(files) => { setPrefilledAttachments(files); setIsAddModalOpen(true); }}
         />
       );
       case 'projects':
@@ -232,8 +254,8 @@ const App: React.FC = () => {
         return (
           <InviteManagement 
             departments={departments} employees={employees} 
-            onInvite={(u) => setDoc(doc(db, "users", u.id), { ...u, createdAt: serverTimestamp() })} 
-            onUpdateEmployee={(id, updates) => updateDoc(doc(db, "users", id), updates)}
+            onInvite={(u) => setDoc(firestoreDoc(db, "users", u.id), { ...u, createdAt: serverTimestamp() })} 
+            onUpdateEmployee={(id, updates) => updateDoc(firestoreDoc(db, "users", id), updates)}
             positions={positions} 
           />
         );
@@ -242,19 +264,17 @@ const App: React.FC = () => {
           <SettingsPage 
             deletedDocs={deletedDocs} deletedFolders={deletedFolders} 
             autoOpenFiles={autoOpenFiles} setAutoOpenFiles={setAutoOpenFiles} 
-            onRestoreDoc={async (docObj)=> await updateDoc(doc(db, "documents", docObj.id), { deletedAt: null })} 
-            onRestoreFolder={async (fObj)=> await updateDoc(doc(db, "folders", fObj.id), { deletedAt: null })} 
+            onRestoreDoc={async (docObj)=> await updateDoc(firestoreDoc(db, "documents", docObj.id), { deletedAt: null })} 
+            onRestoreFolder={async (fObj)=> await updateDoc(firestoreDoc(db, "folders", fObj.id), { deletedAt: null })} 
             departments={departments} 
             onAddDept={(name) => addDoc(collection(db, "departments"), { name, employeeCount: 0 })}
-            onDeleteDepartment={async (id) => deleteDoc(doc(db, "departments", id))} 
+            onDeleteDepartment={async (id) => deleteDoc(firestoreDoc(db, "departments", id))} 
             onLogout={handleLogout}
           />
         );
       default: return <Dashboard documents={activeDocs} />;
     }
   };
-
-  if (!currentUser || !currentOrg) return <AuthPage onLogin={handleLogin} />;
 
   return (
     <Layout 
@@ -264,11 +284,13 @@ const App: React.FC = () => {
       onLogout={handleLogout}
       organizationName={currentOrg.name}
     >
-      <div className="fixed bottom-6 left-6 z-[100] flex gap-2">
-         <button onClick={() => setUserRoleView(userRoleView === 'admin' ? 'employee' : 'admin')} className="bg-slate-800 text-white px-4 py-2 rounded-full text-[10px] font-black shadow-2xl hover:bg-slate-700 transition-all border border-slate-600">
-           البوابة الحالية: {userRoleView === 'admin' ? 'المدير' : 'الموظف'}
-         </button>
-      </div>
+      {currentUser?.role === 'admin' && (
+        <div className="fixed bottom-6 left-6 z-[100] flex gap-2">
+           <button onClick={() => setUserRoleView(userRoleView === 'admin' ? 'employee' : 'admin')} className="bg-slate-800 text-white px-4 py-2 rounded-full text-[10px] font-black shadow-2xl hover:bg-slate-700 transition-all border border-slate-600">
+             البوابة الحالية: {userRoleView === 'admin' ? 'المدير' : 'الموظف'}
+           </button>
+        </div>
+      )}
 
       {userRoleView === 'employee' && activeTab === 'dashboard' ? (
         <EmployeePortal documents={documents} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />
@@ -291,7 +313,20 @@ const App: React.FC = () => {
         title={confirmDelete?.type === 'doc' ? 'حذف الوثيقة' : confirmDelete?.type === 'folder' ? 'حذف الأضبارة' : 'حذف'}
         message="هل أنت متأكد؟ سيتم نقل العنصر لسلة المهملات."
         confirmLabel="نعم، حذف" cancelLabel="إلغاء"
-        onConfirm={executeDelete} onCancel={() => setConfirmDelete(null)}
+        onConfirm={async () => {
+          if (!confirmDelete) return;
+          if (confirmDelete.type === 'doc') {
+            await updateDoc(firestoreDoc(db, "documents", confirmDelete.id), { deletedAt: new Date().toISOString() });
+            setActiveView('list');
+          } else if (confirmDelete.type === 'folder') {
+            await updateDoc(firestoreDoc(db, "folders", confirmDelete.id), { deletedAt: new Date().toISOString() });
+          } else if (confirmDelete.type === 'project') {
+            await deleteDoc(firestoreDoc(db, "projects", confirmDelete.id));
+            setActiveProjectView('list');
+          }
+          setConfirmDelete(null);
+        }} 
+        onCancel={() => setConfirmDelete(null)}
       />
     </Layout>
   );
