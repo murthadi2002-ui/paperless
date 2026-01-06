@@ -1,9 +1,10 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, FileText, Briefcase, Users, Bell, Settings, PlusCircle, LogOut, ChevronLeft, ChevronRight, MessageSquare, ClipboardList, Building2
 } from 'lucide-react';
 import { CURRENT_USER } from '../constants';
+import ConfirmModal from './ConfirmModal';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -24,7 +25,20 @@ const LogoP = ({ size = 22 }: { size?: number }) => (
 );
 
 const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAddClick, onLogout, organizationName }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // يبدأ مصغراً إذا كانت الشاشة أصغر من الكمبيوتر (lg: 1024px)
+  const [isCollapsed, setIsCollapsed] = useState(window.innerWidth < 1024);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // مراقبة تغيير حجم الشاشة لضمان حالة التصغير في الآيباد
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        setIsCollapsed(true);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const menuItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
@@ -38,18 +52,35 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAd
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-cairo transition-all duration-300 text-right" dir="rtl">
+      
+      <ConfirmModal 
+        isOpen={showLogoutConfirm}
+        title="تأكيد الخروج"
+        message="هل أنت متأكد من رغبتك في تسجيل الخروج؟ سيتعين عليك إدخال بياناتك مرة أخرى للوصول."
+        confirmLabel="نعم، تسجيل الخروج"
+        cancelLabel="تراجع"
+        type="danger"
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          onLogout?.();
+        }}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
+
       {/* Sidebar */}
-      <aside className={`${isCollapsed ? 'w-16' : 'w-52'} bg-white border-l border-slate-200 flex flex-col transition-all duration-300 z-40 relative shadow-xl shadow-slate-200/30`}>
+      <aside className={`${isCollapsed ? 'w-16' : 'lg:w-52 w-16'} bg-white border-l border-slate-200/60 flex flex-col transition-all duration-300 z-40 relative shadow-xl shadow-slate-200/30`}>
+        
+        {/* زر التحكم: يظهر فقط في شاشات الكمبيوتر (lg) ويختفي في الآيباد والأصغر */}
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)} 
-          className="absolute -left-3 top-10 w-6 h-10 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:text-emerald-600 shadow-sm z-50 transition-all hover:bg-emerald-50"
+          className="hidden lg:flex absolute -left-3 top-10 w-6 h-10 bg-white border border-slate-200 rounded-full items-center justify-center text-slate-400 hover:text-emerald-600 shadow-sm z-50 transition-all hover:bg-emerald-50"
         >
           {isCollapsed ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
         </button>
 
-        <div className={`p-4 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} transition-all`}>
+        <div className={`p-4 flex items-center ${isCollapsed ? 'justify-center' : 'lg:gap-3 justify-center lg:justify-start'} transition-all`}>
           <LogoP size={isCollapsed ? 14 : 18} />
-          {!isCollapsed && <h1 className="text-lg font-black text-slate-800 tracking-tight">Paperless</h1>}
+          {!isCollapsed && <h1 className="hidden lg:block text-lg font-black text-slate-800 tracking-tight">Paperless</h1>}
         </div>
 
         <nav className="flex-1 mt-2 px-2 space-y-1 overflow-y-auto no-scrollbar">
@@ -59,29 +90,29 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onAd
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5 px-3'} py-3 rounded-xl text-[11px] font-black transition-all duration-200 group ${
+                className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'lg:gap-2.5 lg:px-3 justify-center lg:justify-start'} py-3 rounded-xl text-[11px] font-black transition-all duration-200 group ${
                   activeTab === item.id 
                     ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' 
                     : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
                 }`}
               >
                 <Icon size={16} className="shrink-0 transition-transform group-hover:scale-110" />
-                {!isCollapsed && <span className="flex-1 text-right truncate">{item.label}</span>}
+                {!isCollapsed && <span className="hidden lg:block flex-1 text-right truncate">{item.label}</span>}
               </button>
             );
           })}
         </nav>
 
         <div className="p-2 border-t border-slate-100">
-          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5 p-2.5 bg-slate-50 rounded-xl'} transition-all`}>
+          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'lg:gap-2.5 lg:p-2.5 lg:bg-slate-50 justify-center lg:justify-start'} rounded-xl transition-all`}>
             <img src={CURRENT_USER.avatar} alt="User" className="w-8 h-8 rounded-lg border-2 border-white shadow-sm shrink-0 object-cover" />
             {!isCollapsed && (
               <>
-                <div className="flex-1 overflow-hidden text-right">
+                <div className="hidden lg:block flex-1 overflow-hidden text-right">
                   <p className="text-[9px] font-black text-slate-800 truncate leading-none">{CURRENT_USER.name}</p>
                   <p className="text-[8px] font-bold text-slate-400 truncate mt-1">{organizationName}</p>
                 </div>
-                <button onClick={onLogout} className="text-slate-300 hover:text-red-500 transition-colors shrink-0" title="تسجيل الخروج">
+                <button onClick={() => setShowLogoutConfirm(true)} className="hidden lg:block text-slate-300 hover:text-red-500 transition-colors shrink-0" title="تسجيل الخروج">
                   <LogOut size={16} />
                 </button>
               </>

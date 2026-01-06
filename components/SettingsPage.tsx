@@ -9,7 +9,7 @@ import {
   ToggleRight, Sliders, HardDrive, ShieldAlert,
   Fingerprint, CreditCard, ChevronDown, Check, X,
   Layout, Building2, Layers, Users2, ArrowRightLeft, LogOut,
-  Hash, Phone, Award, GraduationCap
+  Hash, Phone, Award, GraduationCap, Crown, Sparkles, CheckCircle
 } from 'lucide-react';
 import TrashBin from './TrashBin';
 import ConfirmModal from './ConfirmModal';
@@ -33,7 +33,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   deletedDocs, deletedFolders, autoOpenFiles, setAutoOpenFiles, 
   onRestoreDoc, onRestoreFolder, departments, onAddDept, onDeleteDepartment, onLogout
 }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'organization' | 'trash'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'organization' | 'subscription' | 'trash'>('profile');
   const [avatar, setAvatar] = useState(CURRENT_USER.avatar);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [newDeptName, setNewDeptName] = useState('');
@@ -178,8 +178,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
       {/* Main Tabs Area */}
       <div className="space-y-6">
-        <div className="flex items-center justify-between bg-white/60 p-2 rounded-2xl border border-slate-200 shadow-sm backdrop-blur-sm">
-          <div className="flex gap-1.5 flex-wrap">
+        <div className="flex items-center justify-between bg-white/60 p-2 rounded-2xl border border-slate-200 shadow-sm backdrop-blur-sm overflow-x-auto no-scrollbar">
+          <div className="flex gap-1.5 flex-nowrap whitespace-nowrap">
             <button 
               onClick={() => setActiveTab('profile')} 
               className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'profile' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white'}`}
@@ -191,6 +191,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
               className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'organization' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white'}`}
             >
               <Building size={16} /> إعدادات المنشأة
+            </button>
+            <button 
+              onClick={() => setActiveTab('subscription')} 
+              className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'subscription' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white'}`}
+            >
+              <CreditCard size={16} /> الاشتراك والفوترة
             </button>
             <button 
               onClick={() => setActiveTab('trash')} 
@@ -379,6 +385,129 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                         <button onClick={() => setDeptToDeleteId(dept.id)} className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18}/></button>
                       </div>
                     ))}
+                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'subscription' && (
+            <div className="space-y-8">
+              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-16 -mt-16 z-0"></div>
+                <div className="z-10 text-right">
+                  <h3 className="text-lg font-black text-slate-800 flex items-center gap-3">
+                    <Crown size={24} className="text-amber-500" /> حالة الاشتراك الحالية
+                  </h3>
+                  <p className="text-xs font-bold text-slate-400 mt-2">أنت الآن تستخدم النسخة التجريبية المحدودة للمنشآت.</p>
+                </div>
+                <div className="bg-emerald-50 px-6 py-3 rounded-2xl border border-emerald-100 z-10">
+                   <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block">الأيام المتبقية</span>
+                   <span className="text-2xl font-black text-emerald-700 tracking-tight">14 يوم</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Monthly Plan */}
+                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm hover:border-emerald-500 transition-all group flex flex-col h-full">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="p-3 bg-slate-50 text-slate-400 rounded-2xl group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors"><Activity size={24} /></div>
+                      <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">أساسي</span>
+                    </div>
+                    <h4 className="text-xl font-black text-slate-800">اشتراك شهري</h4>
+                    <p className="text-[10px] font-bold text-slate-400 mt-2">إدارة مرنة للمنشآت الصغيرة والمتوسطة.</p>
+                    
+                    <div className="mt-8 mb-8">
+                       <span className="text-3xl font-black text-slate-900 tracking-tight">45,000</span>
+                       <span className="text-xs font-black text-slate-400 mr-2">د.ع / شهرياً</span>
+                    </div>
+
+                    <ul className="space-y-4">
+                       {[ 'أرشفة غير محدودة', 'دعم فني 24/7', 'تشفير بيانات متقدم' ].map((feat, i) => (
+                         <li key={i} className="flex items-center gap-3 text-[11px] font-bold text-slate-600">
+                            <CheckCircle size={14} className="text-emerald-500" /> {feat}
+                         </li>
+                       ))}
+                    </ul>
+                  </div>
+                  <button className="w-full mt-10 py-4 bg-slate-50 text-slate-500 rounded-2xl font-black text-xs hover:bg-emerald-600 hover:text-white transition-all shadow-sm active:scale-95">اشترك الآن</button>
+                </div>
+
+                {/* Semi-Annual Plan */}
+                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm hover:border-indigo-500 transition-all group flex flex-col h-full relative overflow-hidden">
+                  <div className="absolute top-4 left-4 rotate-12 bg-indigo-600 text-white px-3 py-1 rounded-lg text-[8px] font-black shadow-lg">توفير شهر</div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="p-3 bg-slate-50 text-slate-400 rounded-2xl group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors"><ShieldCheck size={24} /></div>
+                      <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">إداري</span>
+                    </div>
+                    <h4 className="text-xl font-black text-slate-800">اشتراك نصف سنوي</h4>
+                    <p className="text-[10px] font-bold text-slate-400 mt-2">الخيار الأمثل للاستقرار الإداري المستدام.</p>
+                    
+                    <div className="mt-8 mb-8">
+                       <span className="text-3xl font-black text-slate-900 tracking-tight">225,000</span>
+                       <span className="text-xs font-black text-slate-400 mr-2">د.ع / 6 أشهر</span>
+                    </div>
+
+                    <ul className="space-y-4">
+                       {[ 'أرشفة غير محدودة', 'أولوية في الدعم', 'تقارير تحليلية ذكية', 'دعم متعدد الأقسام' ].map((feat, i) => (
+                         <li key={i} className="flex items-center gap-3 text-[11px] font-bold text-slate-600">
+                            <CheckCircle size={14} className="text-indigo-500" /> {feat}
+                         </li>
+                       ))}
+                    </ul>
+                  </div>
+                  <button className="w-full mt-10 py-4 bg-slate-50 text-slate-500 rounded-2xl font-black text-xs hover:bg-indigo-600 hover:text-white transition-all shadow-sm active:scale-95">اشترك الآن</button>
+                </div>
+
+                {/* Annual Plan */}
+                <div className="bg-white p-8 rounded-[2.5rem] border-2 border-amber-500 shadow-xl flex flex-col h-full relative overflow-hidden ring-4 ring-amber-50">
+                  <div className="absolute top-0 right-0 p-2 bg-amber-500 text-white rounded-bl-2xl shadow-lg z-10"><Sparkles size={16} /></div>
+                  <div className="absolute top-4 left-4 -rotate-12 bg-amber-600 text-white px-3 py-1 rounded-lg text-[8px] font-black shadow-lg">توفير شهرين</div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl"><Crown size={24} /></div>
+                      <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest">الخيار الذكي</span>
+                    </div>
+                    <h4 className="text-xl font-black text-slate-800">اشتراك سنوي</h4>
+                    <p className="text-[10px] font-bold text-slate-400 mt-2">تحكم كامل وتوفير أقصى للميزانية السنوية.</p>
+                    
+                    <div className="mt-8 mb-8">
+                       <span className="text-4xl font-black text-slate-900 tracking-tight">450,000</span>
+                       <span className="text-xs font-black text-slate-400 mr-2">د.ع / سنوياً</span>
+                    </div>
+
+                    <ul className="space-y-4">
+                       {[ 'أرشفة غير محدودة', 'مدير حساب مخصص', 'تعديلات برمجية حسب الطلب', 'سعة تخزين ضخمة', 'ربط نطاق مخصص (SSO)' ].map((feat, i) => (
+                         <li key={i} className="flex items-center gap-3 text-[11px] font-bold text-slate-800">
+                            <CheckCircle size={14} className="text-amber-500" /> {feat}
+                         </li>
+                       ))}
+                    </ul>
+                  </div>
+                  <button className="w-full mt-10 py-4 bg-amber-500 text-white rounded-2xl font-black text-xs hover:bg-amber-600 transition-all shadow-lg shadow-amber-100 active:scale-95">اشترك في الباقة السنوية</button>
+                </div>
+              </div>
+
+              {/* Zain Cash Section */}
+              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+                 <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex items-center gap-5">
+                       <div className="w-16 h-16 bg-red-600 text-white rounded-2xl flex items-center justify-center font-black text-xl shadow-xl shadow-red-100">ZC</div>
+                       <div className="text-right">
+                          <h3 className="text-lg font-black text-slate-800">الدفع عبر زين كاش (Zain Cash)</h3>
+                          <p className="text-xs font-bold text-slate-400 mt-1 italic">سيتم عرض بيانات الدفع فور تزويدنا بالتفاصيل من قبل مدير المنشأة.</p>
+                       </div>
+                    </div>
+                    <div className="px-6 py-3 bg-red-50 border border-red-100 rounded-2xl">
+                       <span className="text-[10px] font-black text-red-600 uppercase tracking-widest block">طريقة الدفع المعتمدة</span>
+                       <span className="text-sm font-black text-red-700">زين كاش العراق</span>
+                    </div>
+                 </div>
+                 
+                 <div className="p-6 bg-slate-50 border border-slate-100 rounded-2xl flex items-center gap-4 text-slate-400">
+                    <AlertCircle size={20} />
+                    <p className="text-[10px] font-bold">بانتظار تفاصيل المحفظة أو رابط الدفع لتفعيل الأتمتة البرمجية لعملية الاشتراك.</p>
                  </div>
               </div>
             </div>
