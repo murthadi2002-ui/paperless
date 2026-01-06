@@ -127,6 +127,28 @@ const App: React.FC = () => {
     setActiveTab('dashboard');
   };
 
+  // وظيفة "الخروج من المنشأة نهائياً"
+  const handleLeaveOrganization = async () => {
+    if (!currentUser) return;
+    try {
+      // 1. تحديث مستند المستخدم في Firestore لمسح ارتباطه بالمنشأة
+      const userRef = firestoreDoc(db, "users", currentUser.id);
+      await updateDoc(userRef, {
+        organizationId: "",
+        role: "employee",
+        status: "pending", // سيعيده هذا إلى حالة الانتظار/الاختيار
+        department: "",
+        permissions: []
+      });
+
+      // 2. تسجيل الخروج من Firebase للعودة لصفحة الدخول
+      await handleLogout();
+    } catch (error) {
+      console.error("Error leaving organization:", error);
+      alert("حدث خطأ أثناء محاولة الخروج من المنشأة.");
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
@@ -174,7 +196,6 @@ const App: React.FC = () => {
           <DocumentList 
             documents={activeDocs} folders={activeFolders} projects={projects}
             onAddFolder={async (f) => {
-              // ربط الإضبارة تلقائياً بالمشروع المختار في الفلتر
               const folderData = { 
                 ...f, 
                 projectId: selectedProjectId !== 'all' ? selectedProjectId : null,
@@ -240,6 +261,7 @@ const App: React.FC = () => {
             onAddDept={async (name) => await addDoc(collection(db, "departments"), { name, employeeCount: 0 })}
             onDeleteDepartment={async (id) => await deleteDoc(firestoreDoc(db, "departments", id))} 
             onLogout={handleLogout}
+            onLeaveOrganization={handleLeaveOrganization}
             currentUser={currentUser}
           />
         );
@@ -264,7 +286,6 @@ const App: React.FC = () => {
         onAdd={async (d) => await addDoc(collection(db, "documents"), { ...d, organizationId: currentOrg?.id, createdAt: serverTimestamp() })} 
         folders={folders} 
         projects={projects}
-        // تمرير المشروع والإضبارة المختارة لتعيينها تلقائياً عند الأرشفة
         defaultProjectId={selectedProjectId}
         defaultFolderId={activeFolderId}
         initialAttachments={prefilledAttachments}

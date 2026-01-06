@@ -15,12 +15,13 @@ interface SettingsPageProps {
   onAddDept: (name: string) => Promise<void>;
   onDeleteDepartment: (id: string, transferToId?: string) => Promise<void>;
   onLogout?: () => void;
+  onLeaveOrganization?: () => void;
   currentUser: User | null;
 }
 
 const SettingsPage: React.FC<SettingsPageProps> = ({ 
   deletedDocs, deletedFolders, autoOpenFiles, setAutoOpenFiles, 
-  onRestoreDoc, onRestoreFolder, departments, onAddDept, onDeleteDepartment, onLogout, currentUser
+  onRestoreDoc, onRestoreFolder, departments, onAddDept, onDeleteDepartment, onLogout, onLeaveOrganization, currentUser
 }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'organization' | 'subscription' | 'trash'>('profile');
   const [avatar, setAvatar] = useState(currentUser?.avatar || '');
@@ -30,6 +31,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [deptToDeleteId, setDeptToDeleteId] = useState<string | null>(null);
   const [transferTargetId, setTransferTargetId] = useState<string>('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   const [profileData, setProfileData] = useState({
     name: currentUser?.name || '',
@@ -52,23 +54,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     }
   }, [currentUser]);
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => setAvatar(event.target?.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleConfirmDeleteDept = async () => {
-    if (deptToDeleteId) {
-      await onDeleteDepartment(deptToDeleteId, transferTargetId || undefined);
-      setDeptToDeleteId(null);
-      setTransferTargetId('');
-    }
-  };
-
   const stats = useMemo(() => [
     { label: 'إجمالي الأقسام', value: departments.length, icon: Building2, color: 'text-indigo-600', bg: 'bg-indigo-50' },
     { label: 'سلة المهملات', value: deletedDocs.length + deletedFolders.length, icon: Trash2, color: 'text-red-500', bg: 'bg-red-50' },
@@ -80,15 +65,33 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 text-right" dir="rtl">
+      {/* مودال تأكيد تسجيل الخروج العادي */}
       <ConfirmModal 
         isOpen={showLogoutConfirm}
         title="تأكيد الخروج"
-        message="هل أنت متأكد من رغبتك في تسجيل الخروج؟"
+        message="هل أنت متأكد من رغبتك في تسجيل الخروج من حسابك؟"
         confirmLabel="نعم، تسجيل الخروج"
         cancelLabel="تراجع"
         type="danger"
         onConfirm={() => onLogout?.()}
         onCancel={() => setShowLogoutConfirm(false)}
+      />
+
+      {/* مودال تأكيد الخروج من المنشأة نهائياً */}
+      <ConfirmModal 
+        isOpen={showLeaveConfirm}
+        title="مغادرة المنشأة نهائياً"
+        message={
+          <div className="space-y-2">
+            <p>سيتم فك ارتباط حسابك بهذه المنشأة ومسح كافة صلاحياتك.</p>
+            <p className="text-red-500 font-black">تحتاج لرمز دعوة جديد للعودة مرة أخرى لهذه المنشأة.</p>
+          </div>
+        }
+        confirmLabel="نعم، مغادرة المنشأة"
+        cancelLabel="إلغاء"
+        type="danger"
+        onConfirm={() => onLeaveOrganization?.()}
+        onCancel={() => setShowLeaveConfirm(false)}
       />
 
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -143,9 +146,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 </div>
                 <h4 className="text-xl font-black text-slate-800">{profileData.name}</h4>
                 <p className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-4 py-1.5 rounded-full mt-2 border border-emerald-100">{profileData.title}</p>
-                <button onClick={() => setShowLogoutConfirm(true)} className="w-full mt-6 py-3.5 bg-red-50 text-red-600 rounded-xl font-black text-[10px] hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-2 border border-red-100">
-                  <LogOut size={16} /> الخروج من هذه المنشأة
-                </button>
+                <div className="w-full space-y-2 mt-6">
+                  <button onClick={() => setShowLogoutConfirm(true)} className="w-full py-3 bg-slate-100 text-slate-600 rounded-xl font-black text-[10px] hover:bg-slate-200 transition-all flex items-center justify-center gap-2 border border-slate-200">
+                    <LogOut size={16} /> تسجيل الخروج من الحساب
+                  </button>
+                  <button onClick={() => setShowLeaveConfirm(true)} className="w-full py-3.5 bg-red-50 text-red-600 rounded-xl font-black text-[10px] hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-2 border border-red-100">
+                    <Trash size={16} /> الخروج من هذه المنشأة نهائياً
+                  </button>
+                </div>
               </div>
 
               <div className="lg:col-span-8 space-y-6">

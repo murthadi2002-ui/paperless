@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   createUserWithEmailAndPassword, 
@@ -19,7 +18,8 @@ import {
   User as UserIcon, Globe, 
   CheckCircle2, Sparkles, PlusCircle,
   Chrome, Send, KeyRound, AlertCircle, Loader2,
-  Clock, ShieldAlert, CheckCircle, RefreshCw
+  Clock, ShieldAlert, CheckCircle, RefreshCw,
+  ExternalLink, Copy
 } from 'lucide-react';
 import { User, Organization } from '../types';
 
@@ -41,6 +41,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
   const [flowStep, setFlowStep] = useState<'auth' | 'verify' | 'onboarding' | 'create-org' | 'join-org' | 'pending'>('auth');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unauthorizedDomain, setUnauthorizedDomain] = useState<string | null>(null);
 
   // Form States
   const [email, setEmail] = useState('');
@@ -49,7 +50,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
   const [orgName, setOrgName] = useState('');
   const [orgCode, setOrgCode] = useState('');
 
-  // المراقب التلقائي للمستخدم
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -58,7 +58,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
           return;
         }
         
-        // جلب بيانات المستخدم من Firestore
         const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
         if (userDoc.exists()) {
           const userData = userDoc.data() as User;
@@ -88,7 +87,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
         await updateProfile(res.user, { displayName: name });
         await sendEmailVerification(res.user);
         
-        // إنشاء سجل مستخدم أولي
         await setDoc(doc(db, "users", res.user.uid), {
           id: res.user.uid,
           name,
@@ -117,6 +115,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
+    setError(null);
+    setUnauthorizedDomain(null);
     try {
       const res = await signInWithPopup(auth, googleProvider);
       const userDoc = await getDoc(doc(db, "users", res.user.uid));
@@ -133,7 +133,11 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
         });
       }
     } catch (err: any) {
-      setError(err.message);
+      if (err.code === 'auth/unauthorized-domain') {
+        setUnauthorizedDomain(window.location.hostname);
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -184,7 +188,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
       const orgData = querySnapshot.docs[0].data() as Organization;
       await setDoc(doc(db, "users", auth.currentUser.uid), {
         organizationId: orgData.id,
-        status: 'pending' // بانتظار موافقة المدير
+        status: 'pending'
       }, { merge: true });
       
       setFlowStep('pending');
@@ -216,6 +220,25 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
           {authMode === 'login' ? 'سجل دخولك للوصول إلى أرشيفك الإداري' : 'ابدأ رحلة الأرشفة الذكية مع Paperless'}
         </p>
       </div>
+
+      {unauthorizedDomain && (
+        <div className="mb-6 p-5 bg-amber-50 border border-amber-200 rounded-2xl space-y-3 animate-in fade-in zoom-in-95">
+           <div className="flex items-center gap-2 text-amber-700 font-black text-[11px]">
+              <ShieldAlert size={18} />
+              تحذير: نطاق غير مصرح به في Firebase
+           </div>
+           <p className="text-[10px] text-amber-600 font-bold leading-relaxed">
+             يجب عليك إضافة هذا النطاق إلى قائمة "Authorized Domains" في لوحة تحكم Firebase:
+           </p>
+           <div className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-amber-100 shadow-inner">
+              <code className="text-[10px] font-black text-slate-700">{unauthorizedDomain}</code>
+              <button onClick={() => navigator.clipboard.writeText(unauthorizedDomain)} className="p-1.5 hover:bg-slate-50 rounded-lg text-slate-400"><Copy size={14}/></button>
+           </div>
+           <a href="https://console.firebase.google.com/" target="_blank" className="flex items-center justify-center gap-2 py-2 bg-amber-600 text-white rounded-xl text-[9px] font-black hover:bg-amber-700 transition-all">
+             <ExternalLink size={12}/> فتح لوحة تحكم Firebase
+           </a>
+        </div>
+      )}
 
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3 text-red-600 animate-in shake duration-300">
@@ -321,7 +344,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 relative overflow-hidden font-cairo" dir="rtl">
-      {/* Background Decor */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-100/30 rounded-full -mr-64 -mt-64 blur-3xl"></div>
       <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-indigo-100/20 rounded-full -ml-64 -mb-64 blur-3xl"></div>
 
