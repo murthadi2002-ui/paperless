@@ -81,7 +81,6 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!currentOrg || !currentUser) return;
 
-    // جلب البيانات الخاصة بالمنشأة فقط
     const unsubDocs = onSnapshot(query(collection(db, "documents"), where("organizationId", "==", currentOrg.id)), 
       (snapshot) => setDocuments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Document))));
     
@@ -128,7 +127,6 @@ const App: React.FC = () => {
     );
   }
 
-  // إذا لم يكن هناك مستخدم أو لم ينضم لمنشأة بعد، نعرض صفحة المصادقة
   if (!currentUser || (currentUser.status === 'pending' && !currentOrg)) {
     return <AuthPage onLogin={handleLogin} />;
   }
@@ -150,6 +148,8 @@ const App: React.FC = () => {
           onAddAttachment={async (at) => await updateDoc(firestoreDoc(db, "documents", currentDocument.id), { attachments: [...currentDocument.attachments, at] })}
           onDeleteAttachment={(atId) => setConfirmDelete({ id: atId, type: 'attachment', parentId: currentDocument.id })}
           onAddTask={(docId, task) => updateDoc(firestoreDoc(db, "documents", docId), { tasks: [...(currentDocument.tasks || []), task], status: DocStatus.IN_PROGRESS })}
+          employees={employees}
+          currentUser={currentUser}
         />
       );
     }

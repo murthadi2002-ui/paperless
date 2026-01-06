@@ -1,15 +1,11 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
-  ChevronRight, Calendar, Hash, User, Building2, Tag, 
+  ChevronRight, Calendar, Hash, Building2, 
   FileText, Download, Info, MoreVertical, Trash2, 
-  PlusCircle, Paperclip, Check, FileSpreadsheet, 
-  FileImage, FileCode, FileQuestion, SendHorizontal, 
-  Clock, UserCheck, AlertCircle, Users, CheckSquare,
-  X, History, Plus, Edit3, Upload, FileUp, UserPlus,
-  ArrowLeft, Send, Mic, Video, Play, Headphones
+  PlusCircle, Paperclip, Check, SendHorizontal, 
+  Clock, CheckSquare, X, Edit3, Mic, Video, Play, Headphones
 } from 'lucide-react';
 import { Document, Attachment, User as UserType, WorkflowTask, DocStatus } from '../types';
-import { MOCK_EMPLOYEES, CURRENT_USER } from '../constants';
 import { updateDoc, doc as firestoreDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -22,6 +18,8 @@ interface DocumentDetailsViewProps {
   onAddAttachment: (file: Attachment) => void;
   onDeleteAttachment: (id: string) => void;
   onAddTask?: (docId: string, task: WorkflowTask) => void;
+  employees: UserType[];
+  currentUser: UserType | null;
 }
 
 const DownloadIconWithProgress: React.FC<{ size?: number, isDownloading: boolean, progress: number }> = ({ size = 18, isDownloading, progress }) => {
@@ -48,7 +46,7 @@ const DownloadIconWithProgress: React.FC<{ size?: number, isDownloading: boolean
 };
 
 const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({ 
-  doc, autoOpenFiles, onBack, onDelete, onUpdateSubject, onAddAttachment, onDeleteAttachment, onAddTask 
+  doc, autoOpenFiles, onBack, onDelete, onUpdateSubject, onAddAttachment, onDeleteAttachment, onAddTask, employees, currentUser 
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -56,8 +54,6 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
   const [editSubject, setEditSubject] = useState(doc.subject);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
-  
-  // States for renaming attachment
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
   const [tempFileName, setTempFileName] = useState('');
 
@@ -69,7 +65,7 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
     instructions: ''
   });
 
-  const canEdit = CURRENT_USER.role === 'admin' || CURRENT_USER.permissions?.includes('تعديل كتاب');
+  const canEdit = currentUser?.role === 'admin' || currentUser?.permissions?.includes('تعديل كتاب');
 
   const base64ToBlob = (base64: string, mime: string) => {
     const byteCharacters = atob(base64.split(',')[1]);
@@ -135,10 +131,10 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
   };
 
   const handleAddTask = () => {
-    if (taskData.assigneeIds.length === 0 || !taskData.dueDate) return;
+    if (!currentUser || taskData.assigneeIds.length === 0 || !taskData.dueDate) return;
     const newTask: WorkflowTask = {
       id: Math.random().toString(36).substr(2, 9),
-      issuerId: CURRENT_USER.id,
+      issuerId: currentUser.id,
       assigneeIds: taskData.assigneeIds,
       dueDate: taskData.dueDate,
       instructions: taskData.instructions,
@@ -175,7 +171,6 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
         }
       }} />
       
-      {/* Header */}
       <div className="flex flex-col lg:flex-row items-center justify-between bg-white p-4 px-6 rounded-2xl border border-slate-200 shadow-sm gap-4">
         <div className="flex items-center gap-4 flex-1 min-w-0 w-full">
           <button onClick={onBack} className="p-2.5 hover:bg-slate-50 rounded-xl text-slate-400 transition-all flex items-center gap-2 font-black text-[11px] shrink-0">
@@ -215,7 +210,6 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Sidebar Info */}
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
             <h3 className="text-[11px] font-black text-slate-400 mb-8 flex items-center gap-2 uppercase tracking-[0.2em]"><Info size={16} className="text-emerald-600" /> تفاصيل الأرشفة</h3>
@@ -239,7 +233,6 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
           </div>
         </div>
 
-        {/* Attachments Section */}
         <div className="lg:col-span-8 space-y-6">
           <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
              <div className="flex items-center justify-between mb-8">
@@ -251,13 +244,11 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
              
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {doc.attachments.map((file) => {
-                  const isMedia = file.type.startsWith('audio/') || file.type.startsWith('video/');
                   const isAudio = file.type.startsWith('audio/');
-                  
                   return (
                     <div key={file.id} className="group bg-slate-50 p-4 rounded-xl border border-slate-100 hover:bg-white hover:shadow-xl hover:border-emerald-100 transition-all flex items-center justify-between gap-3">
                        <div className="flex items-center gap-4 min-w-0 cursor-pointer flex-1" onClick={() => handlePreviewFile(file)}>
-                          <div className={`p-2.5 rounded-xl shadow-sm transition-transform group-hover:scale-110 ${isMedia ? 'bg-indigo-600 text-white' : 'bg-white text-emerald-600'}`}>
+                          <div className={`p-2.5 rounded-xl shadow-sm transition-transform group-hover:scale-110 ${isAudio ? 'bg-indigo-600 text-white' : 'bg-white text-emerald-600'}`}>
                              {isAudio ? <Headphones size={22} /> : getFileIcon(file.type)}
                           </div>
                           <div className="overflow-hidden flex-1">
@@ -275,8 +266,6 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
                              )}
                           </div>
                        </div>
-
-                       {/* Action Buttons - Slim Style */}
                        <div className="flex items-center gap-0.5 shrink-0">
                           {isAudio && (
                             <button className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg" title="تشغيل">
@@ -296,31 +285,23 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
                     </div>
                   );
                 })}
-                {doc.attachments.length === 0 && (
-                  <div className="col-span-full py-16 text-center text-slate-300 border-2 border-dashed border-slate-100 rounded-2xl">
-                    <Paperclip size={40} className="mx-auto opacity-10 mb-3" />
-                    <p className="text-[9px] font-black uppercase tracking-widest">لا توجد مرفقات حالياً</p>
-                  </div>
-                )}
              </div>
           </div>
         </div>
       </div>
 
-      {/* Task Modal */}
       {showTaskForm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                 <h3 className="text-sm font-black text-slate-800 flex items-center gap-2"><SendHorizontal size={18} className="text-emerald-600" /> توجيه إداري</h3>
+                 <h3 className="text-sm font-black text-slate-800 flex items-center gap-2"><SendHorizontal size={18} className="text-emerald-600" /> توجيه إداري لزملاء حقيقيين</h3>
                  <button onClick={() => setShowTaskForm(false)} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400"><X size={18} /></button>
               </div>
               <div className="p-6 space-y-4">
                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mr-1">المكلفون</label>
-                    {/* Fixed TypeScript error by adding explicit type casting to the map function in Array.from */}
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mr-1">المكلفون من المنشأة</label>
                     <select multiple className="w-full h-32 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-xs" value={taskData.assigneeIds} onChange={(e) => setTaskData({...taskData, assigneeIds: Array.from(e.target.selectedOptions, (o: HTMLOptionElement) => o.value)})}>
-                      {MOCK_EMPLOYEES.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                      {employees.filter(emp => emp.id !== currentUser?.id).map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
                     </select>
                  </div>
                  <div className="space-y-1">
@@ -332,7 +313,7 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
                     <textarea className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-xs resize-none" rows={3} value={taskData.instructions} onChange={e => setTaskData({...taskData, instructions: e.target.value})} />
                  </div>
                  <div className="flex gap-2 pt-4">
-                    <button onClick={handleAddTask} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-black text-[11px] shadow-lg hover:bg-emerald-700 transition-all">إرسال</button>
+                    <button onClick={handleAddTask} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-black text-[11px] shadow-lg hover:bg-emerald-700 transition-all">إرسال التوجيه</button>
                     <button onClick={() => setShowTaskForm(false)} className="px-6 py-3 bg-slate-100 text-slate-500 rounded-xl font-black text-[11px]">إلغاء</button>
                  </div>
               </div>
