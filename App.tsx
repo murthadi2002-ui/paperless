@@ -23,7 +23,7 @@ import ConfirmModal from './components/ConfirmModal';
 import AuthPage from './components/AuthPage';
 
 import { CURRENT_USER } from './constants';
-import { Document, Folder, Project, Department, User, Organization, Position, WorkflowTask, DocStatus } from './types';
+import { Document, Folder, Project, Department, User, Organization, Position, WorkflowTask, DocStatus, Attachment } from './types';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(CURRENT_USER);
@@ -40,6 +40,7 @@ const App: React.FC = () => {
   const [activeProjectView, setActiveProjectView] = useState<'list' | 'details'>('list');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
+  const [prefilledAttachments, setPrefilledAttachments] = useState<Attachment[]>([]);
   const [userRoleView, setUserRoleView] = useState<'admin' | 'employee'>('admin'); 
   const [dbError, setDbError] = useState<string | null>(null);
   
@@ -124,60 +125,9 @@ const App: React.FC = () => {
     setSelectedProjectId(docRef.id);
   };
 
-  const handleInviteEmployee = async (user: User) => {
-    const { id, ...data } = user;
-    await setDoc(doc(db, "users", id), { ...data, createdAt: serverTimestamp() });
-  };
-
-  const handleUpdateEmployee = async (userId: string, updates: Partial<User>) => {
-    await updateDoc(doc(db, "users", userId), updates);
-  };
-
-  const handleAddDept = async (name: string) => {
-    await addDoc(collection(db, "departments"), { name, employeeCount: 0 });
-  };
-
-  const handleDeleteDepartment = async (id: string, transferToId?: string) => {
-    try {
-      const deptToDelete = departments.find(d => d.id === id);
-      if (!deptToDelete) return;
-
-      if (transferToId) {
-        const targetDept = departments.find(d => d.id === transferToId);
-        if (targetDept) {
-          const batch = writeBatch(db);
-          const usersToTransfer = employees.filter(e => e.department === deptToDelete.name);
-          
-          usersToTransfer.forEach(user => {
-            batch.update(doc(db, "users", user.id), { department: targetDept.name });
-          });
-
-          batch.update(doc(db, "departments", targetDept.id), { 
-            employeeCount: (targetDept.employeeCount || 0) + (deptToDelete.employeeCount || 0) 
-          });
-
-          await batch.commit();
-        }
-      }
-
-      await deleteDoc(doc(db, "departments", id));
-    } catch (e) {
-      console.error("Delete Dept Error:", e);
-    }
-  };
-
-  const handleAddTask = async (docId: string, task: WorkflowTask) => {
-    const document = documents.find(d => d.id === docId);
-    if (document) {
-      await updateDoc(doc(db, "documents", docId), {
-        tasks: [...(document.tasks || []), task],
-        status: DocStatus.IN_PROGRESS
-      });
-    }
-  };
-
-  const handleUpdateSubject = async (docId: string, newSubject: string) => {
-    await updateDoc(doc(db, "documents", docId), { subject: newSubject });
+  const handleOpenAddDocWithFiles = (files: Attachment[]) => {
+    setPrefilledAttachments(files);
+    setIsAddModalOpen(true);
   };
 
   const executeDelete = async () => {
@@ -224,10 +174,10 @@ const App: React.FC = () => {
           autoOpenFiles={autoOpenFiles}
           onBack={() => { setActiveView('list'); setCurrentDocument(null); }} 
           onDelete={() => setConfirmDelete({ id: liveDoc.id, type: 'doc' })}
-          onUpdateSubject={(sub) => handleUpdateSubject(liveDoc.id, sub)}
+          onUpdateSubject={(sub) => updateDoc(doc(db, "documents", liveDoc.id), { subject: sub })}
           onAddAttachment={async (at) => await updateDoc(doc(db, "documents", liveDoc.id), { attachments: [...liveDoc.attachments, at] })}
           onDeleteAttachment={(atId) => setConfirmDelete({ id: atId, type: 'attachment', parentId: liveDoc.id })}
-          onAddTask={handleAddTask}
+          onAddTask={(docId, task) => updateDoc(doc(db, "documents", docId), { tasks: [...(liveDoc.tasks || []), task], status: DocStatus.IN_PROGRESS })}
         />
       );
     }
@@ -260,6 +210,7 @@ const App: React.FC = () => {
           projects={projects} 
           onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); setActiveTab('documents'); }}
           onAddDocument={handleAddDocument}
+          onOpenAddModalWithFile={handleOpenAddDocWithFiles}
         />
       );
       case 'projects':
@@ -276,8 +227,8 @@ const App: React.FC = () => {
         return (
           <InviteManagement 
             departments={departments} employees={employees} 
-            onInvite={handleInviteEmployee} 
-            onUpdateEmployee={handleUpdateEmployee}
+            onInvite={(u) => setDoc(doc(db, "users", u.id), { ...u, createdAt: serverTimestamp() })} 
+            onUpdateEmployee={(id, updates) => updateDoc(doc(db, "users", id), updates)}
             positions={positions} 
           />
         );
@@ -289,8 +240,8 @@ const App: React.FC = () => {
             onRestoreDoc={async (docObj)=> await updateDoc(doc(db, "documents", docObj.id), { deletedAt: null })} 
             onRestoreFolder={async (fObj)=> await updateDoc(doc(db, "folders", fObj.id), { deletedAt: null })} 
             departments={departments} 
-            onAddDept={handleAddDept}
-            onDeleteDepartment={handleDeleteDepartment} 
+            onAddDept={(name) => addDoc(collection(db, "departments"), { name, employeeCount: 0 })}
+            onDeleteDepartment={async (id) => deleteDoc(doc(db, "departments", id))} 
           />
         );
       default: return <Dashboard documents={activeDocs} />;
@@ -307,16 +258,6 @@ const App: React.FC = () => {
       onLogout={() => { setCurrentUser(null); setCurrentOrg(null); }}
       organizationName={currentOrg.name}
     >
-      {dbError && (
-        <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-2xl flex items-center justify-between animate-pulse">
-           <div className="flex items-center gap-3">
-             <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-             <p className="text-[11px] font-black text-red-700">{dbError}</p>
-           </div>
-           <button onClick={() => window.location.reload()} className="text-[10px] font-black text-red-800 underline">تحديث الصفحة</button>
-        </div>
-      )}
-
       <div className="fixed bottom-6 left-6 z-[100] flex gap-2">
          <button onClick={() => setUserRoleView(userRoleView === 'admin' ? 'employee' : 'admin')} className="bg-slate-800 text-white px-4 py-2 rounded-full text-[10px] font-black shadow-2xl hover:bg-slate-700 transition-all border border-slate-600">
            البوابة الحالية: {userRoleView === 'admin' ? 'المدير' : 'الموظف'}
@@ -329,12 +270,13 @@ const App: React.FC = () => {
 
       <AddDocumentModal 
         isOpen={isAddModalOpen} 
-        onClose={()=>setIsAddModalOpen(false)} 
+        onClose={()=>{setIsAddModalOpen(false); setPrefilledAttachments([]);}} 
         onAdd={handleAddDocument} 
         folders={folders} 
         projects={projects}
         defaultProjectId={selectedProjectId}
         defaultFolderId={activeFolderId}
+        initialAttachments={prefilledAttachments}
       />
       <CreateProjectModal isOpen={isAddProjectModalOpen} onClose={()=>setIsAddProjectModalOpen(false)} onSave={handleAddProject} />
 
