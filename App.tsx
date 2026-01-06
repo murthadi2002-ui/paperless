@@ -1,6 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc as firestoreDoc, query, orderBy, where, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { 
+  collection, onSnapshot, addDoc, updateDoc, 
+  deleteDoc, doc as firestoreDoc, query, orderBy, where, 
+  setDoc, getDoc, serverTimestamp 
+} from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { Loader2 } from 'lucide-react';
 import { db, auth } from './firebase';
@@ -49,6 +52,7 @@ const App: React.FC = () => {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'doc' | 'folder' | 'attachment' | 'project', parentId?: string } | null>(null);
 
+  // مراقبة حالة المصادقة
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setAuthLoading(true);
@@ -75,29 +79,44 @@ const App: React.FC = () => {
     return unsubscribe;
   }, []);
 
+  // جلب البيانات اللحظية حسب المنشأة والمشاريع
   useEffect(() => {
     if (!currentOrg || !currentUser) return;
 
+    // جلب المستندات
     const unsubDocs = onSnapshot(query(collection(db, "documents"), where("organizationId", "==", currentOrg.id)), 
       (snapshot) => setDocuments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Document))));
     
+    // جلب الأضابير
     const unsubFolders = onSnapshot(query(collection(db, "folders"), where("organizationId", "==", currentOrg.id)), 
       (snapshot) => setFolders(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Folder))));
 
+    // جلب المشاريع (ترتيب حسب الأحدث)
     const unsubProjects = onSnapshot(query(collection(db, "projects"), where("organizationId", "==", currentOrg.id)), 
-      (snapshot) => setProjects(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Project))));
+      (snapshot) => {
+        const projs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Project));
+        // ترتيب المشاريع حسب التاريخ (الأحدث أولاً)
+        const sortedProjs = [...projs].sort((a, b) => {
+           const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+           const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+           return dateB - dateA;
+        });
+        setProjects(sortedProjs);
+        
+        // فتح آخر مشروع تم إنشاؤه تلقائياً إذا لم يكن هناك مشروع مختار
+        if (sortedProjs.length > 0 && selectedProjectId === 'all') {
+          setSelectedProjectId(sortedProjs[0].id);
+        }
+      });
 
     const unsubUsers = onSnapshot(query(collection(db, "users"), where("organizationId", "==", currentOrg.id)), 
       (snapshot) => setEmployees(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as User))));
 
     const unsubDepts = onSnapshot(collection(db, "departments"), 
       (snapshot) => setDepartments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Department))));
-    
-    const unsubPos = onSnapshot(collection(db, "positions"), 
-      (snapshot) => setPositions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Position))));
 
     return () => {
-      unsubDocs(); unsubFolders(); unsubProjects(); unsubUsers(); unsubDepts(); unsubPos();
+      unsubDocs(); unsubFolders(); unsubProjects(); unsubUsers(); unsubDepts();
     };
   }, [currentOrg, currentUser]);
 
@@ -108,24 +127,19 @@ const App: React.FC = () => {
     setActiveTab('dashboard');
   };
 
-  const handleLogin = (user: User, org: Organization) => {
-    setCurrentUser(user);
-    setCurrentOrg(org);
-  };
-
   if (authLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center space-y-4">
           <Loader2 className="w-12 h-12 text-emerald-600 animate-spin mx-auto" />
-          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">جاري تأمين الاتصال بالنظام...</p>
+          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">تأمين الوصول اللحظي...</p>
         </div>
       </div>
     );
   }
 
   if (!currentUser || (currentUser.status === 'pending' && !currentOrg)) {
-    return <AuthPage onLogin={handleLogin} />;
+    return <AuthPage onLogin={(u, o) => { setCurrentUser(u); setCurrentOrg(o); }} />;
   }
 
   const renderContent = () => {
@@ -152,12 +166,23 @@ const App: React.FC = () => {
     }
 
     switch (activeTab) {
-      case 'dashboard': return <Dashboard documents={activeDocs} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
+      case 'dashboard': 
+        return <Dashboard documents={activeDocs} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
+      
       case 'documents': 
         return (
           <DocumentList 
             documents={activeDocs} folders={activeFolders} projects={projects}
-            onAddFolder={async (f) => await addDoc(collection(db, "folders"), { ...f, organizationId: currentOrg?.id, createdAt: serverTimestamp() })} 
+            onAddFolder={async (f) => {
+              // ربط الإضبارة تلقائياً بالمشروع المختار في الفلتر
+              const folderData = { 
+                ...f, 
+                projectId: selectedProjectId !== 'all' ? selectedProjectId : null,
+                organizationId: currentOrg?.id, 
+                createdAt: new Date().toISOString() 
+              };
+              await addDoc(collection(db, "folders"), folderData);
+            }} 
             onOpenUnit={(d) => { setCurrentDocument(d); setActiveView('details'); }}
             onDeleteDoc={(id) => setConfirmDelete({ id, type: 'doc' })}
             onDeleteFolder={(id) => setConfirmDelete({ id, type: 'folder' })}
@@ -168,20 +193,23 @@ const App: React.FC = () => {
             currentUser={currentUser}
           />
         );
-      // Pass currentUser and employees to EmployeePortal
-      case 'my-tasks': return <EmployeePortal documents={activeDocs} currentUser={currentUser} employees={employees} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
-      case 'messages': return (
-        <MessagingPage 
-          documents={activeDocs} folders={activeFolders} projects={projects} 
-          employees={employees} currentUser={currentUser}
-          onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); setActiveTab('documents'); }}
-          onAddDocument={async (d) => await addDoc(collection(db, "documents"), { ...d, organizationId: currentOrg?.id, createdAt: serverTimestamp() })}
-          onOpenAddModalWithFile={(files) => { setPrefilledAttachments(files); setIsAddModalOpen(true); }}
-        />
-      );
+
+      case 'my-tasks': 
+        return <EmployeePortal documents={activeDocs} currentUser={currentUser} employees={employees} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
+      
+      case 'messages': 
+        return (
+          <MessagingPage 
+            documents={activeDocs} folders={activeFolders} projects={projects} 
+            employees={employees} currentUser={currentUser}
+            onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); setActiveTab('documents'); }}
+            onAddDocument={async (d) => await addDoc(collection(db, "documents"), { ...d, organizationId: currentOrg?.id, createdAt: serverTimestamp() })}
+            onOpenAddModalWithFile={(files) => { setPrefilledAttachments(files); setIsAddModalOpen(true); }}
+          />
+        );
+
       case 'projects':
         if (activeProjectView === 'details' && currentProject) return <ProjectDetailsView project={currentProject} documents={activeDocs} folders={activeFolders} onBack={()=>{setActiveProjectView('list');setCurrentProject(null)}} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
-        // Pass currentUser to ProjectList
         return (
           <ProjectList 
             projects={projects} documents={activeDocs} currentUser={currentUser}
@@ -190,6 +218,7 @@ const App: React.FC = () => {
             onDeleteProject={(id) => setConfirmDelete({ id, type: 'project' })}
           />
         );
+
       case 'invites': 
         return (
           <InviteManagement 
@@ -199,6 +228,7 @@ const App: React.FC = () => {
             positions={positions} 
           />
         );
+
       case 'settings': 
         return (
           <SettingsPage 
@@ -213,7 +243,7 @@ const App: React.FC = () => {
             currentUser={currentUser}
           />
         );
-      default: return <Dashboard documents={activeDocs} />;
+      default: return <Dashboard documents={activeDocs} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
     }
   };
 
@@ -223,7 +253,7 @@ const App: React.FC = () => {
       setActiveTab={(t)=>{setActiveTab(t);setActiveView('list');setActiveProjectView('list')}} 
       onAddClick={()=>setIsAddModalOpen(true)}
       onLogout={handleLogout}
-      organizationName={currentOrg?.name || "منشأة غير محددة"}
+      organizationName={currentOrg?.name || "تحميل..."}
       currentUser={currentUser}
     >
       {renderContent()}
@@ -234,16 +264,22 @@ const App: React.FC = () => {
         onAdd={async (d) => await addDoc(collection(db, "documents"), { ...d, organizationId: currentOrg?.id, createdAt: serverTimestamp() })} 
         folders={folders} 
         projects={projects}
+        // تمرير المشروع والإضبارة المختارة لتعيينها تلقائياً عند الأرشفة
         defaultProjectId={selectedProjectId}
         defaultFolderId={activeFolderId}
         initialAttachments={prefilledAttachments}
       />
-      <CreateProjectModal isOpen={isAddProjectModalOpen} onClose={()=>setIsAddProjectModalOpen(false)} onSave={async (p) => await addDoc(collection(db, "projects"), { ...p, organizationId: currentOrg?.id, createdAt: serverTimestamp() })} />
+      
+      <CreateProjectModal 
+        isOpen={isAddProjectModalOpen} 
+        onClose={()=>setIsAddProjectModalOpen(false)} 
+        onSave={async (p) => await addDoc(collection(db, "projects"), { ...p, organizationId: currentOrg?.id, createdAt: new Date().toISOString() })} 
+      />
 
       <ConfirmModal 
         isOpen={!!confirmDelete} 
-        title="حذف العنصر"
-        message="هل أنت متأكد؟"
+        title="تأكيد الحذف"
+        message="هل أنت متأكد؟ سيتم نقل العنصر إلى سلة المهملات."
         confirmLabel="نعم، حذف" cancelLabel="إلغاء"
         onConfirm={async () => {
           if (!confirmDelete) return;
@@ -263,4 +299,5 @@ const App: React.FC = () => {
     </Layout>
   );
 };
+
 export default App;
