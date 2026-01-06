@@ -8,7 +8,8 @@ import {
   Plus, Trash, Users, Bell, Globe, Database, 
   ToggleRight, Sliders, HardDrive, ShieldAlert,
   Fingerprint, CreditCard, ChevronDown, Check, X,
-  Layout, Building2, Layers, Users2, ArrowRightLeft
+  Layout, Building2, Layers, Users2, ArrowRightLeft, LogOut,
+  Hash, Phone, Award, GraduationCap
 } from 'lucide-react';
 import TrashBin from './TrashBin';
 import ConfirmModal from './ConfirmModal';
@@ -25,13 +26,14 @@ interface SettingsPageProps {
   departments: Department[];
   onAddDept: (name: string) => Promise<void>;
   onDeleteDepartment: (id: string, transferToId?: string) => Promise<void>;
+  onLogout?: () => void;
 }
 
 const SettingsPage: React.FC<SettingsPageProps> = ({ 
   deletedDocs, deletedFolders, autoOpenFiles, setAutoOpenFiles, 
-  onRestoreDoc, onRestoreFolder, departments, onAddDept, onDeleteDepartment
+  onRestoreDoc, onRestoreFolder, departments, onAddDept, onDeleteDepartment, onLogout
 }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'organization' | 'archiving' | 'trash'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'organization' | 'trash'>('profile');
   const [avatar, setAvatar] = useState(CURRENT_USER.avatar);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [newDeptName, setNewDeptName] = useState('');
@@ -39,12 +41,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   // States for deletion with transfer
   const [deptToDeleteId, setDeptToDeleteId] = useState<string | null>(null);
   const [transferTargetId, setTransferTargetId] = useState<string>('');
+  
+  // Logout Confirmation State
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const [profileData, setProfileData] = useState({
     name: CURRENT_USER.name,
     email: CURRENT_USER.email,
     title: 'المدير التنفيذي للعمليات',
-    phone: '+964 770 123 4567'
+    phone: '+964 770 123 4567',
+    jobId: 'EMP-2024-001',
+    specialization: 'إدارة نظم المعلومات',
+    qualification: 'ماجستير علوم حاسوب'
   });
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,7 +69,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       const targetDept = departments.find(d => d.id === deptToDeleteId);
       const hasEmployees = (targetDept?.employeeCount || 0) > 0;
       
-      // إذا كان هناك موظفون ولم يتم اختيار قسم بديل، نمنع الحذف
       if (hasEmployees && !transferTargetId) return;
 
       await onDeleteDepartment(deptToDeleteId, transferTargetId || undefined);
@@ -81,9 +88,23 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     { label: 'مستوى الأمان', value: 'مرتفع', icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-50' }
   ], [departments, deletedDocs, deletedFolders]);
 
+  const isAdmin = CURRENT_USER.role === 'admin';
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700 text-right" dir="rtl">
-      {/* Confirm Modal with Transfer Selection */}
+      {/* Confirm Logout Modal */}
+      <ConfirmModal 
+        isOpen={showLogoutConfirm}
+        title="تأكيد الخروج"
+        message="هل أنت متأكد من رغبتك في تسجيل الخروج من هذه المنشأة؟ ستحتاج إلى تسجيل الدخول مرة أخرى للوصول إلى الأرشيف."
+        confirmLabel="نعم، تسجيل الخروج"
+        cancelLabel="تراجع"
+        type="danger"
+        onConfirm={() => onLogout?.()}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
+
+      {/* Confirm Delete Dept Modal */}
       <ConfirmModal 
         isOpen={!!deptToDeleteId}
         title="حذف القسم الإداري"
@@ -111,7 +132,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     ))}
                   </select>
                 </div>
-                {!transferTargetId && <p className="text-[10px] text-red-500 font-black">* مطلوب اختيار قسم للمتابعة</p>}
               </div>
             ) : (
               <p className="text-slate-400 text-xs">سيتم حذف القسم بشكل نهائي لأنه لا يحتوي على موظفين حالياً.</p>
@@ -156,9 +176,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         ))}
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Tabs Area */}
       <div className="space-y-6">
-        {/* Horizontal Navigation Tabs */}
         <div className="flex items-center justify-between bg-white/60 p-2 rounded-2xl border border-slate-200 shadow-sm backdrop-blur-sm">
           <div className="flex gap-1.5 flex-wrap">
             <button 
@@ -174,12 +193,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
               <Building size={16} /> إعدادات المنشأة
             </button>
             <button 
-              onClick={() => setActiveTab('archiving')} 
-              className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'archiving' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white'}`}
-            >
-              <Archive size={16} /> تفضيلات الأرشفة
-            </button>
-            <button 
               onClick={() => setActiveTab('trash')} 
               className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'trash' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white'}`}
             >
@@ -188,12 +201,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
         </div>
 
-        {/* Tab Content Rendering */}
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
           {activeTab === 'profile' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* Profile Card */}
-              <div className="lg:col-span-4 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col items-center text-center">
+              <div className="lg:col-span-4 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col items-center text-center h-fit">
                 <div className="relative group mb-6">
                   <div className="w-36 h-36 rounded-3xl overflow-hidden border-4 border-slate-50 shadow-xl relative">
                     <img src={avatar} alt="Profile" className="w-full h-full object-cover" />
@@ -215,62 +226,83 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">تاريخ الانضمام</span>
                       <span className="text-[11px] font-bold text-slate-700 tracking-tight">{CURRENT_USER.joinedDate || '2023-01-01'}</span>
                    </div>
+                   
+                   <button 
+                    onClick={() => setShowLogoutConfirm(true)}
+                    className="w-full mt-6 py-3.5 bg-red-50 text-red-600 rounded-xl font-black text-[10px] hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-2 border border-red-100 shadow-sm active:scale-95"
+                   >
+                     <LogOut size={16} /> الخروج من هذه المنشأة
+                   </button>
                 </div>
               </div>
 
-              {/* Edit Form Card & Permissions */}
               <div className="lg:col-span-8 space-y-6">
                  <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
                     <h3 className="text-sm font-black text-slate-800 flex items-center gap-3"><Sliders size={18} className="text-emerald-600" /> البيانات الأساسية</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                       <div className="space-y-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                       <div className="space-y-1.5">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">الاسم بالكامل</label>
                           <div className="relative">
-                             <UserIcon className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                             <input type="text" className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.name} onChange={e => setProfileData({...profileData, name: e.target.value})} />
+                             <UserIcon className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+                             <input type="text" className="w-full pr-10 pl-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.name} onChange={e => setProfileData({...profileData, name: e.target.value})} />
                           </div>
                        </div>
-                       <div className="space-y-2">
+                       <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">الرقم الوظيفي</label>
+                          <div className="relative">
+                             <Hash className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+                             <input type="text" className="w-full pr-10 pl-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.jobId} onChange={e => setProfileData({...profileData, jobId: e.target.value})} />
+                          </div>
+                       </div>
+                       <div className="space-y-1.5">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">البريد الإلكتروني</label>
                           <div className="relative">
-                             <Mail className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                             <input type="email" className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.email} onChange={e => setProfileData({...profileData, email: e.target.value})} />
+                             <Mail className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+                             <input type="email" className="w-full pr-10 pl-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.email} onChange={e => setProfileData({...profileData, email: e.target.value})} />
                           </div>
                        </div>
-                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">رقم الهاتف</label>
+                       <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">رقم الهاتف الرسمي</label>
                           <div className="relative">
-                             <Smartphone className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                             <input type="text" className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.phone} onChange={e => setProfileData({...profileData, phone: e.target.value})} />
+                             <Phone className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+                             <input type="text" dir="ltr" className="w-full pr-10 pl-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500/10 text-right" value={profileData.phone} onChange={e => setProfileData({...profileData, phone: e.target.value})} />
                           </div>
                        </div>
-                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">المسمى الوظيفي</label>
+                       <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">المؤهل العلمي</label>
                           <div className="relative">
-                             <Briefcase className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                             <input type="text" className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.title} onChange={e => setProfileData({...profileData, title: e.target.value})} />
+                             <GraduationCap className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+                             <input type="text" className="w-full pr-10 pl-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.qualification} onChange={e => setProfileData({...profileData, qualification: e.target.value})} />
+                          </div>
+                       </div>
+                       <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">التخصص المهني</label>
+                          <div className="relative">
+                             <Award className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+                             <input type="text" className="w-full pr-10 pl-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500/10" value={profileData.specialization} onChange={e => setProfileData({...profileData, specialization: e.target.value})} />
                           </div>
                        </div>
                     </div>
                     
                     <div className="pt-6 flex justify-end">
-                       <button className="px-10 py-3.5 bg-emerald-600 text-white rounded-xl font-black text-xs shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center gap-2 active:scale-95">
+                       <button className="px-10 py-3.5 bg-emerald-600/10 text-emerald-700 rounded-xl font-black text-xs border border-emerald-200/50 hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-2 active:scale-95 shadow-sm">
                           <Save size={18} /> حفظ البيانات الشخصية
                        </button>
                     </div>
                  </div>
 
-                 {/* Granted Permissions Section - Read Only */}
                  <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
                     <div className="flex items-center justify-between">
                        <h3 className="text-sm font-black text-slate-800 flex items-center gap-3"><ShieldCheck size={18} className="text-indigo-600" /> الصلاحيات الممنوحة</h3>
-                       <div className="px-3 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-400 flex items-center gap-1.5"><Lock size={10}/> للقراءة فقط</div>
+                       {!isAdmin && (
+                         <div className="px-3 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-400 flex items-center gap-1.5 animate-in fade-in">
+                            <Lock size={10}/> للقراءة فقط
+                         </div>
+                       )}
                     </div>
-                    <p className="text-[11px] font-bold text-slate-400 leading-relaxed -mt-4">توضح القائمة أدناه الامتيازات الإدارية والفنية المفعلة على حسابك حالياً.</p>
-                    
                     <div className="flex flex-wrap gap-2 pt-2">
-                       {CURRENT_USER.role === 'admin' ? (
-                          <div className="flex items-center gap-2.5 px-4 py-2.5 bg-indigo-50 border border-indigo-100 rounded-xl shadow-sm">
+                       {isAdmin ? (
+                          <div className="flex items-center gap-2.5 px-4 py-2.5 bg-indigo-50 border border-indigo-100 rounded-xl shadow-sm animate-in zoom-in-95">
                              <Zap size={14} className="text-indigo-600" fill="currentColor" />
                              <span className="text-[11px] font-black text-indigo-700 uppercase">صلاحيات مدير النظام الكاملة</span>
                           </div>
@@ -299,7 +331,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
           {activeTab === 'organization' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* Org Identity */}
               <div className="lg:col-span-5 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
                  <h3 className="text-sm font-black text-slate-800 flex items-center gap-3"><Building size={18} className="text-emerald-600" /> هوية المنشأة</h3>
                  <div className="space-y-6">
@@ -320,12 +351,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                           <h4 className="text-[11px] font-black text-indigo-900">إعدادات النطاق المخصص</h4>
                        </div>
                        <p className="text-[10px] font-bold text-indigo-600/80 leading-relaxed">يمكنك ربط تطبيق Paperless بنطاق بريدي خاص بشركتك لتفعيل تسجيل الدخول الموحد (SSO).</p>
-                       <button className="text-[10px] font-black text-indigo-700 underline">إعداد النطاق المخصص الآن</button>
                     </div>
                  </div>
               </div>
 
-              {/* Departments Management */}
               <div className="lg:col-span-7 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
                  <div className="flex items-center justify-between">
                     <h3 className="text-sm font-black text-slate-800 flex items-center gap-3"><Building2 size={18} className="text-emerald-600" /> الهيكل التنظيمي (الأقسام)</h3>
@@ -347,78 +376,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                               <p className="text-[9px] font-bold text-slate-400 mt-0.5">{dept.employeeCount || 0} موظف مكلف</p>
                            </div>
                         </div>
-                        <button 
-                          onClick={() => setDeptToDeleteId(dept.id)} 
-                          className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                        >
-                           <Trash2 size={18}/>
-                        </button>
+                        <button onClick={() => setDeptToDeleteId(dept.id)} className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18}/></button>
                       </div>
                     ))}
-                    {departments.length === 0 && (
-                       <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-100 rounded-3xl">
-                          <Building2 size={48} className="mx-auto text-slate-100 mb-4" />
-                          <p className="text-xs font-black text-slate-300 uppercase tracking-widest">لا توجد أقسام معرفة حالياً</p>
-                       </div>
-                    )}
                  </div>
               </div>
-            </div>
-          )}
-
-          {activeTab === 'archiving' && (
-            <div className="max-w-3xl mx-auto bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm space-y-10">
-               <div className="flex items-center gap-4 border-b border-slate-50 pb-6">
-                  <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><Archive size={24} /></div>
-                  <div>
-                    <h3 className="text-lg font-black text-slate-800">تفضيلات محرك الأرشفة</h3>
-                    <p className="text-xs font-bold text-slate-400 mt-1">تتحكم هذه الإعدادات في كيفية معالجة الذكاء الاصطناعي للمستندات.</p>
-                  </div>
-               </div>
-
-               <div className="space-y-6">
-                  {[
-                    { 
-                      id: 'auto-open', 
-                      label: 'فتح المستندات تلقائياً', 
-                      desc: 'فتح ملف الكتاب بمجرد الضغط على معاينة في الأرشيف.', 
-                      val: autoOpenFiles, 
-                      setter: setAutoOpenFiles 
-                    },
-                    { 
-                      id: 'ai-summary', 
-                      label: 'التلخيص الذكي للكتب', 
-                      desc: 'توليد خلاصة نصية لمحتوى الكتاب فور رفعه باستخدام Gemini.', 
-                      val: true, 
-                      disabled: true 
-                    },
-                    { 
-                      id: 'ocr-extract', 
-                      label: 'التعرف الضوئي (OCR)', 
-                      desc: 'استخراج التواريخ والأرقام تلقائياً من الصور الممسوحة.', 
-                      val: true, 
-                      disabled: true 
-                    }
-                  ].map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-6 bg-slate-50/50 rounded-2xl border border-slate-100 group">
-                       <div className="flex-1 text-right">
-                          <h4 className="text-sm font-black text-slate-800">{item.label}</h4>
-                          <p className="text-[11px] font-bold text-slate-400 mt-1 leading-relaxed">{item.desc}</p>
-                       </div>
-                       <button 
-                        onClick={() => !item.disabled && item.setter?.(!item.val)}
-                        className={`w-14 h-8 rounded-full transition-all relative shrink-0 ${item.val ? 'bg-emerald-600 shadow-lg shadow-emerald-100' : 'bg-slate-200'} ${item.disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                       >
-                         <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${item.val ? 'right-7' : 'right-1'}`}></div>
-                       </button>
-                    </div>
-                  ))}
-               </div>
-
-               <div className="p-6 bg-amber-50/50 border border-amber-100 rounded-2xl flex items-start gap-4">
-                  <ShieldAlert className="text-amber-500 shrink-0" size={20} />
-                  <p className="text-[10px] font-bold text-amber-700 leading-relaxed">ملاحظة: تفعيل "التلخيص الذكي" و "OCR" يتطلب مفتاح API نشطاً ومستوى صلاحيات (مشرف) للتحكم في استهلاك الوحدات المتاحة.</p>
-               </div>
             </div>
           )}
 
@@ -431,12 +393,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     <p className="text-xs font-bold text-slate-400 mt-1">إدارة الوثائق والأضابير التي تم حذفها مؤخراً.</p>
                   </div>
                </div>
-               <TrashBin 
-                  deletedDocs={deletedDocs} 
-                  deletedFolders={deletedFolders} 
-                  onRestoreDoc={onRestoreDoc} 
-                  onRestoreFolder={onRestoreFolder} 
-               />
+               <TrashBin deletedDocs={deletedDocs} deletedFolders={deletedFolders} onRestoreDoc={onRestoreDoc} onRestoreFolder={onRestoreFolder} />
             </div>
           )}
         </div>

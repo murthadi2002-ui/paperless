@@ -102,6 +102,11 @@ const App: React.FC = () => {
     };
   }, [currentOrg]);
 
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setCurrentOrg(null);
+  };
+
   const handleAddDocument = async (newDoc: any) => {
     const { id, ...docData } = newDoc;
     const cleanData = JSON.parse(JSON.stringify(docData));
@@ -242,6 +247,7 @@ const App: React.FC = () => {
             departments={departments} 
             onAddDept={(name) => addDoc(collection(db, "departments"), { name, employeeCount: 0 })}
             onDeleteDepartment={async (id) => deleteDoc(doc(db, "departments", id))} 
+            onLogout={handleLogout}
           />
         );
       default: return <Dashboard documents={activeDocs} />;
@@ -255,7 +261,7 @@ const App: React.FC = () => {
       activeTab={activeTab} 
       setActiveTab={(t)=>{setActiveTab(t);setActiveView('list');setActiveProjectView('list')}} 
       onAddClick={()=>setIsAddModalOpen(true)}
-      onLogout={() => { setCurrentUser(null); setCurrentOrg(null); }}
+      onLogout={handleLogout}
       organizationName={currentOrg.name}
     >
       <div className="fixed bottom-6 left-6 z-[100] flex gap-2">
