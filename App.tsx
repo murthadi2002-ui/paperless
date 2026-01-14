@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   collection, onSnapshot, addDoc, updateDoc, 
-  deleteDoc, firestoreDoc, query, orderBy, where, 
+  deleteDoc, query, orderBy, where, 
   setDoc, getDoc, serverTimestamp, doc as firestoreDocRef
 } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -52,7 +52,6 @@ const App: React.FC = () => {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'doc' | 'folder' | 'attachment' | 'project', parentId?: string } | null>(null);
 
-  // مراقبة حالة المصادقة
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setAuthLoading(true);
@@ -79,7 +78,6 @@ const App: React.FC = () => {
     return unsubscribe;
   }, []);
 
-  // جلب البيانات اللحظية حسب المنشأة والمشاريع
   useEffect(() => {
     if (!currentOrg || !currentUser) return;
 
@@ -138,18 +136,8 @@ const App: React.FC = () => {
     });
   };
 
-  const handleDuplicateFolder = async (folderObj: Folder) => {
-    const { id, ...rest } = folderObj;
-    await addDoc(collection(db, "folders"), {
-      ...rest,
-      name: `${folderObj.name} (نسخة)`,
-      createdAt: new Date().toISOString()
-    });
-  };
-
   const handleMoveDoc = async (docId: string, folderId: string, projectId: string) => {
-    const docRef = firestoreDocRef(db, "documents", docId);
-    await updateDoc(docRef, { folderId, projectId });
+    await updateDoc(firestoreDocRef(db, "documents", docId), { folderId, projectId });
   };
 
   const handleCopyDoc = async (docId: string, folderId: string, projectId: string) => {
@@ -162,6 +150,19 @@ const App: React.FC = () => {
       folderId,
       projectId,
       createdAt: serverTimestamp()
+    });
+  };
+
+  const handleUpdateEmployee = async (id: string, updates: Partial<User>) => {
+    await updateDoc(firestoreDocRef(db, "users", id), updates);
+  };
+
+  const handleKickEmployee = async (id: string) => {
+    await updateDoc(firestoreDocRef(db, "users", id), {
+      organizationId: "",
+      status: "pending",
+      role: "employee",
+      permissions: []
     });
   };
 
@@ -206,27 +207,17 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'dashboard': 
         return <Dashboard documents={activeDocs} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
-      
       case 'documents': 
         return (
           <DocumentList 
             documents={activeDocs} folders={activeFolders} projects={projects}
-            onAddFolder={async (f) => {
-              const folderData = { 
-                ...f, 
-                projectId: selectedProjectId !== 'all' ? selectedProjectId : null,
-                organizationId: currentOrg?.id, 
-                createdAt: new Date().toISOString() 
-              };
-              await addDoc(collection(db, "folders"), folderData);
-            }} 
+            onAddFolder={async (f) => await addDoc(collection(db, "folders"), { ...f, projectId: selectedProjectId !== 'all' ? selectedProjectId : null, organizationId: currentOrg?.id, createdAt: new Date().toISOString() })}
             onOpenUnit={(d) => { setCurrentDocument(d); setActiveView('details'); }}
             onDeleteDoc={(id) => setConfirmDelete({ id, type: 'doc' })}
             onDeleteFolder={(id) => setConfirmDelete({ id, type: 'folder' })}
             onRenameDoc={(id, name) => updateDoc(firestoreDocRef(db, "documents", id), { subject: name })}
             onRenameFolder={(id, name) => updateDoc(firestoreDocRef(db, "folders", id), { name })}
             onDuplicateDoc={handleDuplicateDoc}
-            onDuplicateFolder={handleDuplicateFolder}
             onMoveDoc={handleMoveDoc}
             onCopyDoc={handleCopyDoc}
             selectedProjectId={selectedProjectId}
@@ -236,42 +227,15 @@ const App: React.FC = () => {
             currentUser={currentUser}
           />
         );
-
-      case 'my-tasks': 
-        return <EmployeePortal documents={activeDocs} currentUser={currentUser} employees={employees} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
-      
-      case 'messages': 
-        return (
-          <MessagingPage 
-            documents={activeDocs} folders={activeFolders} projects={projects} 
-            employees={employees} currentUser={currentUser}
-            onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); setActiveTab('documents'); }}
-            onAddDocument={async (d) => await addDoc(collection(db, "documents"), { ...d, organizationId: currentOrg?.id, createdAt: serverTimestamp() })}
-            onOpenAddModalWithFile={(files) => { setPrefilledAttachments(files); setIsAddModalOpen(true); }}
-          />
-        );
-
-      case 'projects':
-        if (activeProjectView === 'details' && currentProject) return <ProjectDetailsView project={currentProject} documents={activeDocs} folders={activeFolders} onBack={()=>{setActiveProjectView('list');setCurrentProject(null)}} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
-        return (
-          <ProjectList 
-            projects={projects} documents={activeDocs} currentUser={currentUser}
-            onSelectProject={(p)=>{setCurrentProject(p);setActiveProjectView('details')}} 
-            onAddProject={()=>setIsAddProjectModalOpen(true)}
-            onDeleteProject={(id) => setConfirmDelete({ id, type: 'project' })}
-          />
-        );
-
       case 'invites': 
         return (
           <InviteManagement 
             departments={departments} employees={employees} 
-            onInvite={async (u) => await setDoc(firestoreDocRef(db, "users", u.id), { ...u, organizationId: currentOrg?.id, createdAt: serverTimestamp() })} 
-            onUpdateEmployee={async (id, updates) => await updateDoc(firestoreDocRef(db, "users", id), updates)}
+            onUpdateEmployee={handleUpdateEmployee}
+            onKickEmployee={handleKickEmployee}
             positions={positions} 
           />
         );
-
       case 'settings': 
         return (
           <SettingsPage 
@@ -283,8 +247,17 @@ const App: React.FC = () => {
             onAddDept={async (name) => await addDoc(collection(db, "departments"), { name, employeeCount: 0 })}
             onDeleteDepartment={async (id) => await deleteDoc(firestoreDocRef(db, "departments", id))} 
             onLogout={handleLogout}
-            onLeaveOrganization={handleLogout}
             currentUser={currentUser}
+          />
+        );
+      case 'messages': 
+        return (
+          <MessagingPage 
+            documents={activeDocs} folders={activeFolders} projects={projects} 
+            employees={employees} currentUser={currentUser}
+            onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); setActiveTab('documents'); }}
+            onAddDocument={async (d) => await addDoc(collection(db, "documents"), { ...d, organizationId: currentOrg?.id, createdAt: serverTimestamp() })}
+            onOpenAddModalWithFile={(files) => { setPrefilledAttachments(files); setIsAddModalOpen(true); }}
           />
         );
       default: return <Dashboard documents={activeDocs} onOpenDoc={(d) => { setCurrentDocument(d); setActiveView('details'); }} />;
@@ -292,53 +265,19 @@ const App: React.FC = () => {
   };
 
   return (
-    <Layout 
-      activeTab={activeTab} 
-      setActiveTab={(t)=>{setActiveTab(t);setActiveView('list');setActiveProjectView('list')}} 
-      onAddClick={()=>setIsAddModalOpen(true)}
-      onLogout={handleLogout}
-      organizationName={currentOrg?.name || "تحميل..."}
-      currentUser={currentUser}
-    >
+    <Layout activeTab={activeTab} setActiveTab={(t)=>{setActiveTab(t);setActiveView('list');}} onAddClick={()=>setIsAddModalOpen(true)} onLogout={handleLogout} organizationName={currentOrg?.name || "تحميل..."} currentUser={currentUser}>
       {renderContent()}
-
-      <AddDocumentModal 
-        isOpen={isAddModalOpen} 
-        onClose={()=>{setIsAddModalOpen(false); setPrefilledAttachments([]);}} 
-        onAdd={async (d) => await addDoc(collection(db, "documents"), { ...d, organizationId: currentOrg?.id, createdAt: serverTimestamp() })} 
-        folders={folders} 
-        projects={projects}
-        defaultProjectId={selectedProjectId}
-        defaultFolderId={activeFolderId}
-        initialAttachments={prefilledAttachments}
-      />
-      
-      <CreateProjectModal 
-        isOpen={isAddProjectModalOpen} 
-        onClose={()=>setIsAddProjectModalOpen(false)} 
-        onSave={async (p) => await addDoc(collection(db, "projects"), { ...p, organizationId: currentOrg?.id, createdAt: new Date().toISOString() })} 
-      />
-
-      <ConfirmModal 
-        isOpen={!!confirmDelete} 
-        title="تأكيد الحذف"
-        message="هل أنت متأكد؟ سيتم نقل العنصر إلى سلة المهملات."
-        confirmLabel="نعم، حذف" cancelLabel="إلغاء"
-        onConfirm={async () => {
-          if (!confirmDelete) return;
-          if (confirmDelete.type === 'doc') {
-            await updateDoc(firestoreDocRef(db, "documents", confirmDelete.id), { deletedAt: new Date().toISOString() });
-            setActiveView('list');
-          } else if (confirmDelete.type === 'folder') {
-            await updateDoc(firestoreDocRef(db, "folders", confirmDelete.id), { deletedAt: new Date().toISOString() });
-          } else if (confirmDelete.type === 'project') {
-            await deleteDoc(firestoreDocRef(db, "projects", confirmDelete.id));
-            setActiveProjectView('list');
-          }
-          setConfirmDelete(null);
-        }} 
-        onCancel={() => setConfirmDelete(null)}
-      />
+      <AddDocumentModal isOpen={isAddModalOpen} onClose={()=>{setIsAddModalOpen(false); setPrefilledAttachments([]);}} onAdd={async (d) => await addDoc(collection(db, "documents"), { ...d, organizationId: currentOrg?.id, createdAt: serverTimestamp() })} folders={folders} projects={projects} defaultProjectId={selectedProjectId} defaultFolderId={activeFolderId} initialAttachments={prefilledAttachments} />
+      <ConfirmModal isOpen={!!confirmDelete} title="تأكيد الحذف" message="هل أنت متأكد؟ سيتم نقل العنصر إلى سلة المهملات." confirmLabel="نعم، حذف" cancelLabel="إلغاء" onConfirm={async () => {
+        if (!confirmDelete) return;
+        if (confirmDelete.type === 'doc') {
+          await updateDoc(firestoreDocRef(db, "documents", confirmDelete.id), { deletedAt: new Date().toISOString() });
+          setActiveView('list');
+        } else if (confirmDelete.type === 'folder') {
+          await updateDoc(firestoreDocRef(db, "folders", confirmDelete.id), { deletedAt: new Date().toISOString() });
+        }
+        setConfirmDelete(null);
+      }} onCancel={() => setConfirmDelete(null)} />
     </Layout>
   );
 };

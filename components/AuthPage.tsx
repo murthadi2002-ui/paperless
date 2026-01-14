@@ -28,12 +28,7 @@ interface AuthPageProps {
 }
 
 const LogoP = ({ size = 28 }: { size?: number }) => (
-  <div 
-    className="bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-200 flex items-center justify-center font-black"
-    style={{ width: size * 1.8, height: size * 1.8, fontSize: size }}
-  >
-    P
-  </div>
+  <div className="bg-emerald-600 text-white rounded-2xl shadow-lg flex items-center justify-center font-black" style={{ width: size * 1.8, height: size * 1.8, fontSize: size }}>P</div>
 );
 
 const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
@@ -41,9 +36,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
   const [flowStep, setFlowStep] = useState<'auth' | 'verify' | 'onboarding' | 'create-org' | 'join-org' | 'pending'>('auth');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [unauthorizedDomain, setUnauthorizedDomain] = useState<string | null>(null);
 
-  // Form States
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -53,18 +46,17 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        if (!firebaseUser.emailVerified && authMode === 'register') {
-          setFlowStep('verify');
-          return;
-        }
-        
         const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
         if (userDoc.exists()) {
           const userData = userDoc.data() as User;
           if (userData.organizationId) {
             const orgDoc = await getDoc(doc(db, "organizations", userData.organizationId));
             if (orgDoc.exists()) {
-              onLogin(userData, orgDoc.data() as Organization);
+              if (userData.status === 'active') {
+                onLogin(userData, orgDoc.data() as Organization);
+              } else {
+                setFlowStep('pending');
+              }
             }
           } else {
             setFlowStep('onboarding');
@@ -79,68 +71,20 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
 
   const handleAuthAction = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
       if (authMode === 'register') {
         const res = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(res.user, { displayName: name });
-        await sendEmailVerification(res.user);
-        
         await setDoc(doc(db, "users", res.user.uid), {
-          id: res.user.uid,
-          name,
-          email,
-          avatar: `https://ui-avatars.com/api/?name=${name}&background=10b981&color=fff`,
-          role: 'employee',
-          organizationId: '',
-          status: 'pending',
-          joinedDate: new Date().toISOString().split('T')[0]
+          id: res.user.uid, name, email, avatar: `https://ui-avatars.com/api/?name=${name}&background=10b981&color=fff`,
+          role: 'employee', organizationId: '', status: 'pending', joinedDate: new Date().toISOString().split('T')[0]
         });
-        
-        setFlowStep('verify');
-      } else if (authMode === 'login') {
+        setFlowStep('onboarding');
+      } else {
         await signInWithEmailAndPassword(auth, email, password);
-      } else {
-        await sendPasswordResetEmail(auth, email);
-        alert('تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني.');
-        setAuthMode('login');
       }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    setError(null);
-    setUnauthorizedDomain(null);
-    try {
-      const res = await signInWithPopup(auth, googleProvider);
-      const userDoc = await getDoc(doc(db, "users", res.user.uid));
-      if (!userDoc.exists()) {
-        await setDoc(doc(db, "users", res.user.uid), {
-          id: res.user.uid,
-          name: res.user.displayName,
-          email: res.user.email,
-          avatar: res.user.photoURL,
-          role: 'employee',
-          organizationId: '',
-          status: 'pending',
-          joinedDate: new Date().toISOString().split('T')[0]
-        });
-      }
-    } catch (err: any) {
-      if (err.code === 'auth/unauthorized-domain') {
-        setUnauthorizedDomain(window.location.hostname);
-      } else {
-        setError(err.message);
-      }
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
   const finalizeCreateOrg = async (e: React.FormEvent) => {
@@ -149,28 +93,16 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
     setLoading(true);
     try {
       const orgId = 'org-' + Math.random().toString(36).substr(2, 5);
+      // توليد رمز طويل وفريد لضمان عدم التكرار
+      const uniqueCode = 'PAPER-' + Math.random().toString(36).substr(2, 4).toUpperCase() + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
       const orgData: Organization = {
-        id: orgId,
-        name: orgName,
-        code: 'PAPER-' + Math.random().toString(36).substr(2, 4).toUpperCase(),
-        ownerId: auth.currentUser.uid,
-        createdAt: new Date().toISOString()
+        id: orgId, name: orgName, code: uniqueCode, ownerId: auth.currentUser.uid, createdAt: new Date().toISOString()
       };
-      
       await setDoc(doc(db, "organizations", orgId), orgData);
-      await setDoc(doc(db, "users", auth.currentUser.uid), {
-        organizationId: orgId,
-        role: 'admin',
-        status: 'active'
-      }, { merge: true });
-      
+      await setDoc(doc(db, "users", auth.currentUser.uid), { organizationId: orgId, role: 'admin', status: 'active' }, { merge: true });
       const updatedUser = (await getDoc(doc(db, "users", auth.currentUser.uid))).data() as User;
       onLogin(updatedUser, orgData);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
   const finalizeJoinOrg = async (e: React.FormEvent) => {
@@ -178,273 +110,75 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
     if (!auth.currentUser) return;
     setLoading(true);
     try {
-      const q = query(collection(db, "organizations"), where("code", "==", orgCode));
+      const q = query(collection(db, "organizations"), where("code", "==", orgCode.trim()));
       const querySnapshot = await getDocs(q);
-      
-      if (querySnapshot.empty) {
-        throw new Error("رمز المنشأة غير صحيح.");
-      }
-      
+      if (querySnapshot.empty) throw new Error("رمز المنشأة غير صحيح أو منتهي الصلاحية.");
       const orgData = querySnapshot.docs[0].data() as Organization;
-      await setDoc(doc(db, "users", auth.currentUser.uid), {
-        organizationId: orgData.id,
-        status: 'pending'
-      }, { merge: true });
-      
+      await setDoc(doc(db, "users", auth.currentUser.uid), { organizationId: orgData.id, status: 'pending' }, { merge: true });
       setFlowStep('pending');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
-
-  const checkVerification = async () => {
-    setLoading(true);
-    await auth.currentUser?.reload();
-    if (auth.currentUser?.emailVerified) {
-      setFlowStep('onboarding');
-    } else {
-      setError("لم يتم التحقق من البريد بعد. يرجى الضغط على الرابط المرسل.");
-    }
-    setLoading(false);
-  };
-
-  const renderAuthForm = () => (
-    <div className="w-full max-w-md bg-white p-10 rounded-[2rem] border border-slate-100 shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-black text-slate-800">
-          {authMode === 'login' ? 'مرحباً بك مجدداً' : authMode === 'register' ? 'إنشاء حساب جديد' : 'استعادة الحساب'}
-        </h2>
-        <p className="text-xs font-bold text-slate-400 mt-2">
-          {authMode === 'login' ? 'سجل دخولك للوصول إلى أرشيفك الإداري' : 'ابدأ رحلة الأرشفة الذكية مع Paperless'}
-        </p>
-      </div>
-
-      {unauthorizedDomain && (
-        <div className="mb-6 p-5 bg-amber-50 border border-amber-200 rounded-2xl space-y-3 animate-in fade-in zoom-in-95">
-           <div className="flex items-center gap-2 text-amber-700 font-black text-[11px]">
-              <ShieldAlert size={18} />
-              تحذير: نطاق غير مصرح به في Firebase
-           </div>
-           <p className="text-[10px] text-amber-600 font-bold leading-relaxed">
-             يجب عليك إضافة هذا النطاق إلى قائمة "Authorized Domains" في لوحة تحكم Firebase:
-           </p>
-           <div className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-amber-100 shadow-inner">
-              <code className="text-[10px] font-black text-slate-700">{unauthorizedDomain}</code>
-              <button onClick={() => navigator.clipboard.writeText(unauthorizedDomain)} className="p-1.5 hover:bg-slate-50 rounded-lg text-slate-400"><Copy size={14}/></button>
-           </div>
-           <a href="https://console.firebase.google.com/" target="_blank" className="flex items-center justify-center gap-2 py-2 bg-amber-600 text-white rounded-xl text-[9px] font-black hover:bg-amber-700 transition-all">
-             <ExternalLink size={12}/> فتح لوحة تحكم Firebase
-           </a>
-        </div>
-      )}
-
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3 text-red-600 animate-in shake duration-300">
-          <AlertCircle size={18} className="shrink-0 mt-0.5" />
-          <p className="text-[10px] font-bold leading-relaxed">{error}</p>
-        </div>
-      )}
-
-      <div className="space-y-4">
-        <button 
-          onClick={handleGoogleLogin}
-          type="button"
-          className="w-full py-3.5 border border-slate-200 rounded-xl flex items-center justify-center gap-3 font-black text-xs text-slate-600 hover:bg-slate-50 transition-all active:scale-95"
-        >
-          <Chrome size={18} className="text-blue-500" />
-          المتابعة باستخدام حساب Google
-        </button>
-
-        <div className="flex items-center gap-4 my-6">
-          <div className="flex-1 h-[1px] bg-slate-100"></div>
-          <span className="text-[10px] font-black text-slate-300 uppercase">أو عبر البريد</span>
-          <div className="flex-1 h-[1px] bg-slate-100"></div>
-        </div>
-
-        <form onSubmit={handleAuthAction} className="space-y-4">
-          {authMode === 'register' && (
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">الاسم الكامل</label>
-              <div className="relative">
-                <UserIcon className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full pr-12 pl-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 font-bold text-sm transition-all" placeholder="أدخل اسمك..." />
-              </div>
-            </div>
-          )}
-          
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">البريد الإلكتروني</label>
-            <div className="relative">
-              <Mail className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-              <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full pr-12 pl-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 font-bold text-sm transition-all" placeholder="email@company.com" />
-            </div>
-          </div>
-
-          {authMode !== 'forgot' && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between px-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">كلمة المرور</label>
-                {authMode === 'login' && (
-                  <button type="button" onClick={() => setAuthMode('forgot')} className="text-[9px] font-black text-emerald-600 hover:underline">نسيت كلمة السر؟</button>
-                )}
-              </div>
-              <div className="relative">
-                <Lock className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full pr-12 pl-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 font-bold text-sm transition-all" placeholder="••••••••" />
-              </div>
-            </div>
-          )}
-
-          <button 
-            disabled={loading}
-            className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-70"
-          >
-            {loading ? <Loader2 className="animate-spin" size={18} /> : (authMode === 'login' ? 'دخول' : authMode === 'register' ? 'إنشاء الحساب' : 'إرسال رابط الاستعادة')}
-            {!loading && <Send size={14} />}
-          </button>
-        </form>
-
-        <div className="text-center pt-4">
-          <p className="text-xs font-bold text-slate-400">
-            {authMode === 'login' ? 'ليس لديك حساب؟' : 'لديك حساب بالفعل؟'}
-            <button 
-              onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
-              className="text-emerald-600 mr-2 hover:underline"
-            >
-              {authMode === 'login' ? 'سجل الآن' : 'سجل دخولك'}
-            </button>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderVerifyStep = () => (
-    <div className="w-full max-w-md bg-white p-12 rounded-[2.5rem] border border-slate-100 shadow-2xl animate-in zoom-in-95 duration-500 text-center space-y-8">
-       <div className="w-24 h-24 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-inner ring-8 ring-emerald-50/50">
-          <Mail size={48} />
-       </div>
-       <div>
-          <h2 className="text-xl font-black text-slate-800">تحقق من بريدك الإلكتروني</h2>
-          <p className="text-[11px] font-bold text-slate-400 mt-4 leading-relaxed">لقد أرسلنا رابط تحقق إلى <span className="text-emerald-600">{email}</span>. يرجى الضغط على الرابط في الرسالة لتفعيل حسابك.</p>
-       </div>
-       <div className="space-y-3 pt-4 border-t border-slate-50">
-          <button onClick={checkVerification} disabled={loading} className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black text-sm shadow-xl flex items-center justify-center gap-2">
-            {loading ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle size={18} />}
-            لقد تم التحقق، أدخلني
-          </button>
-          <button onClick={() => auth.currentUser && sendEmailVerification(auth.currentUser)} className="w-full py-3 text-[10px] font-black text-slate-400 hover:text-emerald-600 flex items-center justify-center gap-2">
-            <RefreshCw size={14} /> إعادة إرسال الرابط
-          </button>
-       </div>
-    </div>
-  );
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 relative overflow-hidden font-cairo" dir="rtl">
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-100/30 rounded-full -mr-64 -mt-64 blur-3xl"></div>
-      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-indigo-100/20 rounded-full -ml-64 -mb-64 blur-3xl"></div>
-
-      <div className="mb-12 text-center z-10 animate-in fade-in duration-1000">
-        <div className="inline-flex items-center gap-4 bg-white px-8 py-4 rounded-[2.2rem] shadow-2xl shadow-emerald-100/50 border border-slate-50 mb-6">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 font-cairo" dir="rtl">
+      <div className="mb-12 text-center">
+        <div className="inline-flex items-center gap-4 bg-white px-8 py-4 rounded-[2.2rem] shadow-2xl border border-slate-50 mb-6">
            <LogoP size={28} />
            <h1 className="text-4xl font-black text-slate-900 tracking-tighter">Paperless</h1>
         </div>
-        <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-[10px]">نظام الأرشفة الإدارية الذكي</p>
       </div>
 
-      <div className="w-full max-w-4xl z-10 flex flex-col items-center">
-        {flowStep === 'auth' && renderAuthForm()}
-        {flowStep === 'verify' && renderVerifyStep()}
-        
-        {flowStep === 'onboarding' && (
-          <div className="flex flex-col md:flex-row gap-8 animate-in zoom-in-95 duration-500">
-            <button 
-              onClick={() => setFlowStep('create-org')}
-              className="group bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all text-right flex flex-col items-start gap-6 w-full max-w-xs"
-            >
-              <div className="p-5 rounded-2xl bg-emerald-50 text-emerald-600 group-hover:scale-110 transition-transform">
-                <PlusCircle size={32} />
-              </div>
-              <div>
-                <h3 className="text-lg font-black text-slate-800 mb-2">تأسيس منشأة جديدة</h3>
-                <p className="text-[10px] font-bold text-slate-400 leading-relaxed">كن مديراً لنظامك الخاص، أنشئ الأقسام وادعُ موظفيك للأرشفة.</p>
-              </div>
-              <ArrowLeft className="text-emerald-600 opacity-0 group-hover:opacity-100 transition-all" />
-            </button>
+      <div className="w-full max-w-md bg-white p-10 rounded-[2rem] border border-slate-100 shadow-xl">
+        {flowStep === 'auth' && (
+          <form onSubmit={handleAuthAction} className="space-y-4">
+             <h2 className="text-2xl font-black text-slate-800 text-center mb-6">{authMode === 'login' ? 'مرحباً بك مجدداً' : 'إنشاء حساب جديد'}</h2>
+             {error && <p className="p-3 bg-red-50 text-red-500 text-[10px] font-bold rounded-lg">{error}</p>}
+             {authMode === 'register' && <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border rounded-xl outline-none font-bold text-sm" placeholder="الاسم الكامل" />}
+             <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border rounded-xl outline-none font-bold text-sm" placeholder="البريد الإلكتروني" />
+             <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border rounded-xl outline-none font-bold text-sm" placeholder="كلمة المرور" />
+             <button disabled={loading} className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black shadow-lg hover:bg-emerald-700 transition-all">{loading ? <Loader2 className="animate-spin mx-auto" /> : (authMode === 'login' ? 'دخول' : 'بدء الحساب')}</button>
+             <button type="button" onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')} className="w-full text-xs font-bold text-slate-400 mt-2">{authMode === 'login' ? 'ليس لديك حساب؟ سجل الآن' : 'لديك حساب؟ دخول'}</button>
+          </form>
+        )}
 
-            <button 
-              onClick={() => setFlowStep('join-org')}
-              className="group bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all text-right flex flex-col items-start gap-6 w-full max-w-xs"
-            >
-              <div className="p-5 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:scale-110 transition-transform">
-                <UserPlus size={32} />
-              </div>
-              <div>
-                <h3 className="text-lg font-black text-slate-800 mb-2">الانضمام لمنشأة</h3>
-                <p className="text-[10px] font-bold text-slate-400 leading-relaxed">لديك رمز دعوة؟ انضم لفريق عملك وابدأ أرشفة الوثائق الموكلة إليك.</p>
-              </div>
-              <ArrowLeft className="text-indigo-600 opacity-0 group-hover:opacity-100 transition-all" />
+        {flowStep === 'onboarding' && (
+          <div className="flex flex-col gap-4">
+            <h2 className="text-lg font-black text-slate-800 text-center mb-4">اختر طريقك في Paperless</h2>
+            <button onClick={() => setFlowStep('create-org')} className="p-6 bg-slate-50 border-2 border-emerald-100 rounded-3xl text-right hover:bg-emerald-50 transition-all group">
+               <h3 className="font-black text-emerald-800 flex items-center gap-2"><PlusCircle size={18} /> تأسيس منشأة جديدة</h3>
+               <p className="text-[10px] font-bold text-slate-400 mt-2">كن مدير النظام الخاص بمنشأتك وادعُ الموظفين.</p>
+            </button>
+            <button onClick={() => setFlowStep('join-org')} className="p-6 bg-slate-50 border-2 border-indigo-100 rounded-3xl text-right hover:bg-indigo-50 transition-all group">
+               <h3 className="font-black text-indigo-800 flex items-center gap-2"><UserPlus size={18} /> الانضمام لمنشأة موجودة</h3>
+               <p className="text-[10px] font-bold text-slate-400 mt-2">استخدم رمز الدعوة الممنوح لك من مديرك.</p>
             </button>
           </div>
         )}
-        
+
         {flowStep === 'create-org' && (
-          <div className="w-full max-w-md bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-2xl animate-in slide-in-from-bottom-8 relative overflow-hidden">
-             <button onClick={() => setFlowStep('onboarding')} className="absolute left-6 top-8 p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-100 transition-all"><ArrowRight size={18} /></button>
-             <h2 className="text-xl font-black text-slate-800 mb-8">تفاصيل المنشأة الجديدة</h2>
-             <form onSubmit={finalizeCreateOrg} className="space-y-6">
-                <div className="space-y-1.5">
-                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">اسم المنشأة / المؤسسة</label>
-                   <div className="relative">
-                      <Building className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                      <input type="text" required value={orgName} onChange={e => setOrgName(e.target.value)} className="w-full pr-12 pl-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 font-bold text-sm" placeholder="مثال: شركة الفاو الهندسية" />
-                   </div>
-                </div>
-                <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-3">
-                   <AlertCircle size={18} className="text-amber-500 shrink-0 mt-0.5" />
-                   <p className="text-[10px] font-bold text-amber-700 leading-relaxed">بصفتك مؤسس المنشأة، ستحصل تلقائياً على صلاحيات مدير النظام الكاملة.</p>
-                </div>
-                <button disabled={loading} className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black shadow-lg hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-70">
-                   {loading ? <Loader2 className="animate-spin" size={18} /> : 'تأسيس والبدء بالأرشفة'}
-                </button>
-             </form>
-          </div>
+          <form onSubmit={finalizeCreateOrg} className="space-y-4">
+             <h2 className="text-xl font-black text-slate-800 text-center">تأسيس منشأتك</h2>
+             <input type="text" required value={orgName} onChange={e => setOrgName(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border rounded-xl outline-none font-bold text-sm" placeholder="اسم المنشأة / الشركة" />
+             <button disabled={loading} className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black">إنشاء المنشأة والبدء</button>
+             <button type="button" onClick={() => setFlowStep('onboarding')} className="w-full text-xs font-bold text-slate-400">تراجع</button>
+          </form>
         )}
 
         {flowStep === 'join-org' && (
-          <div className="w-full max-w-md bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-2xl animate-in slide-in-from-bottom-8 relative overflow-hidden">
-             <button onClick={() => setFlowStep('onboarding')} className="absolute left-6 top-8 p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-100 transition-all"><ArrowRight size={18} /></button>
-             <h2 className="text-xl font-black text-slate-800 mb-8">الانضمام لفريق عمل</h2>
-             <form onSubmit={finalizeJoinOrg} className="space-y-6">
-                <div className="space-y-1.5">
-                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">رمز الانضمام (Join Code)</label>
-                   <div className="relative">
-                      <KeyRound className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                      <input type="text" required value={orgCode} onChange={e => setOrgCode(e.target.value)} className="w-full pr-12 pl-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 font-black text-sm tracking-widest text-center" placeholder="PAPER-XXXX" />
-                   </div>
-                </div>
-                <button disabled={loading} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-black shadow-lg hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-70">
-                   {loading ? <Loader2 className="animate-spin" size={18} /> : 'إرسال طلب الانضمام'}
-                </button>
-             </form>
-          </div>
+          <form onSubmit={finalizeJoinOrg} className="space-y-4">
+             <h2 className="text-xl font-black text-slate-800 text-center">أدخل رمز الانضمام</h2>
+             <input type="text" required value={orgCode} onChange={e => setOrgCode(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border rounded-xl outline-none font-bold text-sm tracking-widest text-center" placeholder="PAPER-XXXX-YYYY" />
+             <button disabled={loading} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-black">إرسال طلب الانضمام</button>
+             <button type="button" onClick={() => setFlowStep('onboarding')} className="w-full text-xs font-bold text-slate-400">تراجع</button>
+          </form>
         )}
 
         {flowStep === 'pending' && (
-          <div className="w-full max-w-md bg-white p-12 rounded-[2.5rem] border border-slate-100 shadow-2xl animate-in zoom-in-95 duration-500 text-center space-y-8">
-             <div className="w-24 h-24 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto shadow-inner ring-8 ring-amber-50/50">
-                <Clock size={48} />
-             </div>
-             <div>
-                <h2 className="text-xl font-black text-slate-800">طلبك قيد المراجعة</h2>
-                <p className="text-[11px] font-bold text-slate-400 mt-4 leading-relaxed">لقد تم إرسال طلب الانضمام لمدير المنشأة بنجاح. يرجى التواصل معه لقبول طلبك لتتمكن من الوصول إلى الأرشيف.</p>
-             </div>
-             <div className="pt-4 border-t border-slate-50">
-                <button onClick={() => { auth.signOut(); setFlowStep('auth'); }} className="text-xs font-black text-slate-400 hover:text-emerald-600 transition-colors">تسجيل الخروج والعودة</button>
-             </div>
+          <div className="text-center space-y-6">
+             <div className="w-20 h-20 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto ring-8 ring-amber-50/50"><Clock size={40} /></div>
+             <h2 className="text-lg font-black text-slate-800">طلبك قيد المراجعة</h2>
+             <p className="text-[11px] font-bold text-slate-400 leading-relaxed">تم إرسال طلبك لمدير المنشأة. يرجى الانتظار حتى يتم قبولك وتعيين صلاحياتك.</p>
+             <button onClick={() => { auth.signOut(); setFlowStep('auth'); }} className="text-xs font-black text-slate-400 hover:text-emerald-600">تسجيل الخروج والعودة</button>
           </div>
         )}
       </div>
