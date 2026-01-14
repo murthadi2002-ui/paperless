@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   collection, onSnapshot, addDoc, updateDoc, 
-  deleteDoc, doc as firestoreDoc, query, orderBy, where, 
-  setDoc, getDoc, serverTimestamp 
+  deleteDoc, firestoreDoc, query, orderBy, where, 
+  setDoc, getDoc, serverTimestamp, doc as firestoreDocRef
 } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { Loader2 } from 'lucide-react';
@@ -57,13 +57,13 @@ const App: React.FC = () => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setAuthLoading(true);
       if (firebaseUser) {
-        const userDocRef = firestoreDoc(db, "users", firebaseUser.uid);
+        const userDocRef = firestoreDocRef(db, "users", firebaseUser.uid);
         const userDoc = await getDoc(userDocRef);
         
         if (userDoc.exists()) {
           const userData = userDoc.data() as User;
           if (userData.organizationId) {
-            const orgDoc = await getDoc(firestoreDoc(db, "organizations", userData.organizationId));
+            const orgDoc = await getDoc(firestoreDocRef(db, "organizations", userData.organizationId));
             if (orgDoc.exists()) {
               setCurrentOrg(orgDoc.data() as Organization);
             }
@@ -87,7 +87,6 @@ const App: React.FC = () => {
       (snapshot) => {
         const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Document));
         setDocuments(docs);
-        // تحديث الكتاب المفتوح إذا حصل عليه تغيير لحظي
         if (currentDocument) {
           const updated = docs.find(d => d.id === currentDocument.id);
           if (updated) setCurrentDocument(updated);
@@ -129,23 +128,6 @@ const App: React.FC = () => {
     setActiveTab('dashboard');
   };
 
-  const handleLeaveOrganization = async () => {
-    if (!currentUser) return;
-    try {
-      const userRef = firestoreDoc(db, "users", currentUser.id);
-      await updateDoc(userRef, {
-        organizationId: "",
-        role: "employee",
-        status: "pending",
-        department: "",
-        permissions: []
-      });
-      await handleLogout();
-    } catch (error) {
-      console.error("Error leaving organization:", error);
-    }
-  };
-
   const handleDuplicateDoc = async (docObj: Document) => {
     const { id, ...rest } = docObj;
     await addDoc(collection(db, "documents"), {
@@ -162,6 +144,24 @@ const App: React.FC = () => {
       ...rest,
       name: `${folderObj.name} (نسخة)`,
       createdAt: new Date().toISOString()
+    });
+  };
+
+  const handleMoveDoc = async (docId: string, folderId: string, projectId: string) => {
+    const docRef = firestoreDocRef(db, "documents", docId);
+    await updateDoc(docRef, { folderId, projectId });
+  };
+
+  const handleCopyDoc = async (docId: string, folderId: string, projectId: string) => {
+    const originalDoc = documents.find(d => d.id === docId);
+    if (!originalDoc) return;
+    const { id, ...rest } = originalDoc;
+    await addDoc(collection(db, "documents"), {
+      ...rest,
+      subject: `${originalDoc.subject} (نسخة منقولة)`,
+      folderId,
+      projectId,
+      createdAt: serverTimestamp()
     });
   };
 
@@ -193,10 +193,10 @@ const App: React.FC = () => {
           autoOpenFiles={autoOpenFiles}
           onBack={() => { setActiveView('list'); setCurrentDocument(null); }} 
           onDelete={() => setConfirmDelete({ id: currentDocument.id, type: 'doc' })}
-          onUpdateSubject={(sub) => updateDoc(firestoreDoc(db, "documents", currentDocument.id), { subject: sub })}
-          onAddAttachment={async (at) => await updateDoc(firestoreDoc(db, "documents", currentDocument.id), { attachments: [...currentDocument.attachments, at] })}
+          onUpdateSubject={(sub) => updateDoc(firestoreDocRef(db, "documents", currentDocument.id), { subject: sub })}
+          onAddAttachment={async (at) => await updateDoc(firestoreDocRef(db, "documents", currentDocument.id), { attachments: [...currentDocument.attachments, at] })}
           onDeleteAttachment={(atId) => setConfirmDelete({ id: atId, type: 'attachment', parentId: currentDocument.id })}
-          onAddTask={(docId, task) => updateDoc(firestoreDoc(db, "documents", docId), { tasks: [...(currentDocument.tasks || []), task], status: DocStatus.IN_PROGRESS })}
+          onAddTask={(docId, task) => updateDoc(firestoreDocRef(db, "documents", docId), { tasks: [...(currentDocument.tasks || []), task], status: DocStatus.IN_PROGRESS })}
           employees={employees}
           currentUser={currentUser}
         />
@@ -223,10 +223,12 @@ const App: React.FC = () => {
             onOpenUnit={(d) => { setCurrentDocument(d); setActiveView('details'); }}
             onDeleteDoc={(id) => setConfirmDelete({ id, type: 'doc' })}
             onDeleteFolder={(id) => setConfirmDelete({ id, type: 'folder' })}
-            onRenameDoc={(id, name) => updateDoc(firestoreDoc(db, "documents", id), { subject: name })}
-            onRenameFolder={(id, name) => updateDoc(firestoreDoc(db, "folders", id), { name })}
+            onRenameDoc={(id, name) => updateDoc(firestoreDocRef(db, "documents", id), { subject: name })}
+            onRenameFolder={(id, name) => updateDoc(firestoreDocRef(db, "folders", id), { name })}
             onDuplicateDoc={handleDuplicateDoc}
             onDuplicateFolder={handleDuplicateFolder}
+            onMoveDoc={handleMoveDoc}
+            onCopyDoc={handleCopyDoc}
             selectedProjectId={selectedProjectId}
             setSelectedProjectId={setSelectedProjectId}
             activeFolderId={activeFolderId}
@@ -264,8 +266,8 @@ const App: React.FC = () => {
         return (
           <InviteManagement 
             departments={departments} employees={employees} 
-            onInvite={async (u) => await setDoc(firestoreDoc(db, "users", u.id), { ...u, organizationId: currentOrg?.id, createdAt: serverTimestamp() })} 
-            onUpdateEmployee={async (id, updates) => await updateDoc(firestoreDoc(db, "users", id), updates)}
+            onInvite={async (u) => await setDoc(firestoreDocRef(db, "users", u.id), { ...u, organizationId: currentOrg?.id, createdAt: serverTimestamp() })} 
+            onUpdateEmployee={async (id, updates) => await updateDoc(firestoreDocRef(db, "users", id), updates)}
             positions={positions} 
           />
         );
@@ -275,13 +277,13 @@ const App: React.FC = () => {
           <SettingsPage 
             deletedDocs={deletedDocs} deletedFolders={deletedFolders} 
             autoOpenFiles={autoOpenFiles} setAutoOpenFiles={setAutoOpenFiles} 
-            onRestoreDoc={async (docObj)=> await updateDoc(firestoreDoc(db, "documents", docObj.id), { deletedAt: null })} 
-            onRestoreFolder={async (fObj)=> await updateDoc(firestoreDoc(db, "folders", fObj.id), { deletedAt: null })} 
+            onRestoreDoc={async (docObj)=> await updateDoc(firestoreDocRef(db, "documents", docObj.id), { deletedAt: null })} 
+            onRestoreFolder={async (fObj)=> await updateDoc(firestoreDocRef(db, "folders", fObj.id), { deletedAt: null })} 
             departments={departments}
             onAddDept={async (name) => await addDoc(collection(db, "departments"), { name, employeeCount: 0 })}
-            onDeleteDepartment={async (id) => await deleteDoc(firestoreDoc(db, "departments", id))} 
+            onDeleteDepartment={async (id) => await deleteDoc(firestoreDocRef(db, "departments", id))} 
             onLogout={handleLogout}
-            onLeaveOrganization={handleLeaveOrganization}
+            onLeaveOrganization={handleLogout}
             currentUser={currentUser}
           />
         );
@@ -325,12 +327,12 @@ const App: React.FC = () => {
         onConfirm={async () => {
           if (!confirmDelete) return;
           if (confirmDelete.type === 'doc') {
-            await updateDoc(firestoreDoc(db, "documents", confirmDelete.id), { deletedAt: new Date().toISOString() });
+            await updateDoc(firestoreDocRef(db, "documents", confirmDelete.id), { deletedAt: new Date().toISOString() });
             setActiveView('list');
           } else if (confirmDelete.type === 'folder') {
-            await updateDoc(firestoreDoc(db, "folders", confirmDelete.id), { deletedAt: new Date().toISOString() });
+            await updateDoc(firestoreDocRef(db, "folders", confirmDelete.id), { deletedAt: new Date().toISOString() });
           } else if (confirmDelete.type === 'project') {
-            await deleteDoc(firestoreDoc(db, "projects", confirmDelete.id));
+            await deleteDoc(firestoreDocRef(db, "projects", confirmDelete.id));
             setActiveProjectView('list');
           }
           setConfirmDelete(null);

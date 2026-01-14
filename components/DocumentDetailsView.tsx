@@ -4,7 +4,7 @@ import {
   FileText, Download, Info, MoreVertical, Trash2, 
   PlusCircle, Paperclip, Check, SendHorizontal, 
   Clock, CheckSquare, X, Edit3, Mic, Video, Play, Headphones,
-  Volume2, Music
+  Volume2, Music, RefreshCw, Loader2
 } from 'lucide-react';
 import { Document, Attachment, User as UserType, WorkflowTask, DocStatus } from '../types';
 import { updateDoc, doc as firestoreDoc } from 'firebase/firestore';
@@ -57,8 +57,11 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
   const [tempFileName, setTempFileName] = useState('');
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [replacingFileId, setReplacingFileId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
   
   const [taskData, setTaskData] = useState({
     assigneeIds: [] as string[],
@@ -66,7 +69,6 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
     instructions: ''
   });
 
-  // مزامنة الاسم المحلي مع التحديثات اللحظية من Firestore
   useEffect(() => {
     setEditSubject(doc.subject);
   }, [doc.subject]);
@@ -127,13 +129,56 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
   };
 
   const handleRenameFile = async (fileId: string) => {
-    if (tempFileName.trim() && tempFileName !== doc.attachments.find(a => a.id === fileId)?.name) {
-      const updatedAttachments = doc.attachments.map(a => 
-        a.id === fileId ? { ...a, name: tempFileName } : a
-      );
-      await updateDoc(firestoreDoc(db, "documents", doc.id), { attachments: updatedAttachments });
+    const file = doc.attachments.find(a => a.id === fileId);
+    if (!file || !tempFileName.trim() || tempFileName === file.name) {
+      setEditingFileId(null);
+      return;
     }
-    setEditingFileId(null);
+
+    setIsRenaming(true);
+    try {
+      // ذكاء اللاحقة: التأكد من وجود اللاحقة في الاسم الجديد
+      const originalExt = file.name.includes('.') ? file.name.split('.').pop() : '';
+      let newName = tempFileName.trim();
+      if (originalExt && !newName.toLowerCase().endsWith(`.${originalExt.toLowerCase()}`)) {
+        newName = `${newName}.${originalExt}`;
+      }
+
+      const updatedAttachments = doc.attachments.map(a => 
+        a.id === fileId ? { ...a, name: newName } : a
+      );
+      await updateDoc(firestoreDoc(db, "documents", doc.id), { 
+        attachments: updatedAttachments,
+        lastModifiedBy: currentUser?.name || 'مستخدم'
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsRenaming(false);
+      setEditingFileId(null);
+    }
+  };
+
+  const handleReplaceFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && replacingFileId) {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = event.target?.result as string;
+        const updatedAttachments = doc.attachments.map(a => 
+          a.id === replacingFileId ? { 
+            ...a, 
+            name: file.name, 
+            type: file.type, 
+            size: (file.size / 1024).toFixed(1) + ' KB',
+            url: base64
+          } : a
+        );
+        await updateDoc(firestoreDoc(db, "documents", doc.id), { attachments: updatedAttachments });
+        setReplacingFileId(null);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleAddTask = () => {
@@ -153,7 +198,7 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
   };
 
   const getFileIcon = (type: string) => {
-    if (type.startsWith('audio/')) return <Volume2 size={22} />;
+    if (type.startsWith('audio/')) return <Headphones size={22} />;
     if (type.startsWith('video/')) return <Video size={22} />;
     return <FileText size={22} />;
   };
@@ -176,6 +221,8 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
           reader.readAsDataURL(file);
         }
       }} />
+
+      <input type="file" ref={replaceInputRef} className="hidden" onChange={handleReplaceFile} />
       
       <div className="flex flex-col lg:flex-row items-center justify-between bg-white p-4 px-6 rounded-2xl border border-slate-200 shadow-sm gap-4">
         <div className="flex items-center gap-4 flex-1 min-w-0 w-full">
@@ -254,14 +301,16 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
                   return (
                     <div key={file.id} className="group bg-slate-50 p-4 rounded-xl border border-slate-100 hover:bg-white hover:shadow-xl hover:border-emerald-100 transition-all flex items-center justify-between gap-3">
                        <div className="flex items-center gap-4 min-w-0 cursor-pointer flex-1" onClick={() => handlePreviewFile(file)}>
-                          <div className={`p-2.5 rounded-xl shadow-sm transition-transform group-hover:scale-110 ${isAudio ? 'bg-indigo-600 text-white' : 'bg-white text-emerald-600'}`}>
+                          <div className={`p-2.5 rounded-xl shadow-sm transition-transform group-hover:scale-110 ${isAudio ? 'bg-indigo-600 text-white shadow-indigo-100' : 'bg-white text-emerald-600 shadow-sm'}`}>
                              {isAudio ? <Music size={22} /> : getFileIcon(file.type)}
                           </div>
                           <div className="overflow-hidden flex-1">
                              {editingFileId === file.id ? (
                                <div className="flex items-center gap-1 w-full" onClick={e => e.stopPropagation()}>
                                  <input autoFocus type="text" className="w-full bg-white border border-emerald-300 rounded-lg px-2 py-1 text-[10px] font-black outline-none" value={tempFileName} onChange={e => setTempFileName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleRenameFile(file.id)} />
-                                 <button onClick={() => handleRenameFile(file.id)} className="p-1 bg-emerald-600 text-white rounded-md shadow-sm"><Check size={12} /></button>
+                                 <button onClick={() => handleRenameFile(file.id)} className="p-1 bg-emerald-600 text-white rounded-md shadow-sm">
+                                   {isRenaming ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                                 </button>
                                  <button onClick={() => setEditingFileId(null)} className="p-1 bg-slate-200 text-slate-500 rounded-md"><X size={12} /></button>
                                </div>
                              ) : (
@@ -278,6 +327,9 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
                               <Play size={16} fill="currentColor" />
                             </button>
                           )}
+                          <button onClick={(e) => { e.stopPropagation(); setReplacingFileId(file.id); replaceInputRef.current?.click(); }} className="p-1.5 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="استبدال الملف">
+                            <RefreshCw size={15} />
+                          </button>
                           <button onClick={(e) => { e.stopPropagation(); setEditingFileId(file.id); setTempFileName(file.name); }} className="p-1.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="تعديل الاسم">
                             <Edit3 size={15} />
                           </button>

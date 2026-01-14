@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Search, FileText, FileDown, FileUp, MoreVertical, Paperclip, Folder as FolderIcon, FolderPlus, Trash2, Star, Copy, Edit3, Clock, Lock, ArrowRight, Filter, ChevronRight } from 'lucide-react';
+import { Search, FileText, FileDown, FileUp, MoreVertical, Paperclip, Folder as FolderIcon, FolderPlus, Trash2, Star, Copy, Edit3, Clock, Lock, ArrowRight, Filter, ChevronRight, Info, Move, X, Briefcase, Save } from 'lucide-react';
 import { DocType, DocStatus, Document, Folder, Project, User } from '../types';
 import CreateFolderModal from './CreateFolderModal';
 
@@ -15,6 +15,8 @@ interface DocumentListProps {
   onDuplicateFolder?: (folder: Folder) => void;
   onRenameDoc?: (id: string, name: string) => void;
   onRenameFolder?: (id: string, name: string) => void;
+  onMoveDoc?: (docId: string, folderId: string, projectId: string) => Promise<void>;
+  onCopyDoc?: (docId: string, folderId: string, projectId: string) => Promise<void>;
   selectedProjectId: string;
   setSelectedProjectId: (id: string) => void;
   activeFolderId: string | null;
@@ -26,7 +28,7 @@ const ContextMenu: React.FC<{
   x: number;
   y: number;
   onClose: () => void;
-  options: { label: string; icon: any; onClick: () => void; danger?: boolean }[];
+  options: { label: string; icon: any; onClick: () => void; danger?: boolean; separator?: boolean }[];
 }> = ({ x, y, onClose, options }) => {
   useEffect(() => {
     const handleClick = () => onClose();
@@ -36,19 +38,21 @@ const ContextMenu: React.FC<{
 
   return (
     <div 
-      className="fixed z-[300] bg-white border border-slate-200 rounded-xl shadow-2xl py-2 w-48 animate-in fade-in zoom-in-95 origin-top-right overflow-hidden"
-      style={{ top: y, left: x - 192 }}
+      className="fixed z-[300] bg-white border border-slate-200 rounded-xl shadow-2xl py-2 w-52 animate-in fade-in zoom-in-95 origin-top-right overflow-hidden"
+      style={{ top: y, left: x - 208 }}
       onClick={(e) => e.stopPropagation()}
     >
       {options.map((opt, i) => (
-        <button
-          key={i}
-          onClick={() => { opt.onClick(); onClose(); }}
-          className={`w-full flex items-center justify-between px-4 py-2.5 text-[11px] font-black transition-colors ${opt.danger ? 'text-red-600 hover:bg-red-50' : 'text-slate-700 hover:bg-slate-50'}`}
-        >
-          <span className="flex-1 text-right">{opt.label}</span>
-          <opt.icon size={14} className="mr-2" />
-        </button>
+        <React.Fragment key={i}>
+          {opt.separator && <hr className="my-1 border-slate-50" />}
+          <button
+            onClick={() => { opt.onClick(); onClose(); }}
+            className={`w-full flex items-center justify-between px-4 py-2.5 text-[11px] font-black transition-colors ${opt.danger ? 'text-red-600 hover:bg-red-50' : 'text-slate-700 hover:bg-slate-50'}`}
+          >
+            <span className="flex-1 text-right">{opt.label}</span>
+            <opt.icon size={14} className="mr-2" />
+          </button>
+        </React.Fragment>
       ))}
     </div>
   );
@@ -57,6 +61,7 @@ const ContextMenu: React.FC<{
 const DocumentList: React.FC<DocumentListProps> = ({ 
   documents, folders, projects, onAddFolder, onOpenUnit, onDeleteDoc, onDeleteFolder,
   onDuplicateDoc, onDuplicateFolder, onRenameDoc, onRenameFolder,
+  onMoveDoc, onCopyDoc,
   selectedProjectId, setSelectedProjectId, activeFolderId, setActiveFolderId, currentUser
 }) => {
   const [viewMode, setViewMode] = useState<'types' | 'folders' | 'confidential' | 'pinned'>('types');
@@ -65,6 +70,12 @@ const DocumentList: React.FC<DocumentListProps> = ({
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; type: 'doc' | 'folder'; id: string } | null>(null);
+  const [showInfoModal, setShowInfoModal] = useState<Document | null>(null);
+  const [moveCopyModal, setMoveCopyModal] = useState<{ docId: string; mode: 'move' | 'copy' } | null>(null);
+
+  // منطق نافذة النقل والنسخ
+  const [targetProjectId, setTargetProjectId] = useState('');
+  const [targetFolderId, setTargetFolderId] = useState('');
 
   const handleContextMenu = (e: React.MouseEvent, type: 'doc' | 'folder', id: string) => {
     e.preventDefault();
@@ -114,14 +125,29 @@ const DocumentList: React.FC<DocumentListProps> = ({
       const doc = documents.find(d => d.id === contextMenu.id);
       return [
         { label: 'معاينة الكتاب', icon: FileText, onClick: () => doc && onOpenUnit(doc) },
-        { label: 'إعادة تسمية الموضوع', icon: Edit3, onClick: () => {
+        { label: 'تفاصيل الأرشفة', icon: Info, onClick: () => setShowInfoModal(doc || null) },
+        { label: 'إعادة تسمية الموضوع', icon: Edit3, separator: true, onClick: () => {
           const newName = prompt('أدخل الموضوع الجديد:', doc?.subject);
           if (newName && onRenameDoc) onRenameDoc(contextMenu.id, newName);
         }},
+        { label: 'نقل إلى إضبارة', icon: Move, onClick: () => setMoveCopyModal({ docId: contextMenu.id, mode: 'move' }) },
+        { label: 'نسخ إلى إضبارة', icon: Copy, onClick: () => setMoveCopyModal({ docId: contextMenu.id, mode: 'copy' }) },
         { label: 'عمل نسخة (تكرار)', icon: Copy, onClick: () => doc && onDuplicateDoc?.(doc) },
-        { label: 'حذف الكتاب', icon: Trash2, danger: true, onClick: () => onDeleteDoc(contextMenu.id) }
+        { label: 'حذف الكتاب', icon: Trash2, danger: true, separator: true, onClick: () => onDeleteDoc(contextMenu.id) }
       ];
     }
+  };
+
+  const handleMoveCopyAction = async () => {
+    if (!moveCopyModal || !targetFolderId || !targetProjectId) return;
+    if (moveCopyModal.mode === 'move') {
+      await onMoveDoc?.(moveCopyModal.docId, targetFolderId, targetProjectId);
+    } else {
+      await onCopyDoc?.(moveCopyModal.docId, targetFolderId, targetProjectId);
+    }
+    setMoveCopyModal(null);
+    setTargetFolderId('');
+    setTargetProjectId('');
   };
 
   return (
@@ -133,6 +159,91 @@ const DocumentList: React.FC<DocumentListProps> = ({
           onClose={() => setContextMenu(null)} 
           options={getContextMenuOptions()} 
         />
+      )}
+
+      {/* نافذة تفاصيل الكتاب */}
+      {showInfoModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
+           <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-8 space-y-6 animate-in zoom-in-95">
+              <div className="flex items-center justify-between">
+                 <h3 className="text-sm font-black text-slate-800 flex items-center gap-2"><Info size={16} className="text-emerald-600" /> تفاصيل الأرشفة</h3>
+                 <button onClick={() => setShowInfoModal(null)} className="p-2 hover:bg-slate-50 rounded-lg text-slate-400"><X size={18}/></button>
+              </div>
+              <div className="space-y-4">
+                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase mb-1">الموضوع</p>
+                    <p className="text-xs font-black text-slate-700">{showInfoModal.subject}</p>
+                 </div>
+                 <div className="grid grid-cols-2 gap-4">
+                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <p className="text-[9px] font-black text-slate-400 uppercase mb-1">الرقم المرجعي</p>
+                      <p className="text-xs font-black text-slate-700">{showInfoModal.refNumber}</p>
+                   </div>
+                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <p className="text-[9px] font-black text-slate-400 uppercase mb-1">تاريخ الأرشفة</p>
+                      <p className="text-xs font-black text-slate-700">{showInfoModal.date}</p>
+                   </div>
+                 </div>
+                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase mb-1">آخر تعديل بواسطة</p>
+                    <p className="text-xs font-black text-emerald-600">{(showInfoModal as any).lastModifiedBy || 'مؤسس النظام'}</p>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* نافذة نقل/نسخ الكتاب */}
+      {moveCopyModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 space-y-6 animate-in zoom-in-95">
+             <div className="flex items-center justify-between">
+                <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                  {moveCopyModal.mode === 'move' ? <Move size={18} className="text-emerald-600" /> : <Copy size={18} className="text-indigo-600" />}
+                  {moveCopyModal.mode === 'move' ? 'نقل الكتاب إلى إضبارة' : 'نسخ الكتاب إلى إضبارة'}
+                </h3>
+                <button onClick={() => setMoveCopyModal(null)} className="p-2 hover:bg-slate-50 rounded-lg text-slate-400"><X size={18}/></button>
+             </div>
+             
+             <div className="space-y-4">
+                <div className="space-y-1.5">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">اختر المشروع المستهدف</label>
+                   <select 
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black outline-none"
+                      value={targetProjectId}
+                      onChange={(e) => { setTargetProjectId(e.target.value); setTargetFolderId(''); }}
+                   >
+                      <option value="">اختر مشروع...</option>
+                      {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                   </select>
+                </div>
+
+                <div className="space-y-1.5">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-2">اختر الإضبارة المستهدفة</label>
+                   <select 
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black outline-none disabled:opacity-50"
+                      value={targetFolderId}
+                      disabled={!targetProjectId}
+                      onChange={(e) => setTargetFolderId(e.target.value)}
+                   >
+                      <option value="">اختر إضبارة من المشروع...</option>
+                      {folders.filter(f => f.projectId === targetProjectId).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                   </select>
+                </div>
+             </div>
+
+             <div className="pt-4 border-t border-slate-50 flex gap-3">
+                <button 
+                   onClick={handleMoveCopyAction}
+                   disabled={!targetFolderId || !targetProjectId}
+                   className="flex-1 py-3.5 bg-emerald-600 text-white rounded-xl font-black text-[11px] shadow-lg hover:bg-emerald-700 transition-all disabled:opacity-50"
+                >
+                   تأكيد {moveCopyModal.mode === 'move' ? 'النقل' : 'النسخ'}
+                </button>
+                <button onClick={() => setMoveCopyModal(null)} className="px-6 py-3.5 bg-slate-100 text-slate-500 rounded-xl font-black text-[11px]">إلغاء</button>
+             </div>
+          </div>
+        </div>
       )}
 
       <CreateFolderModal 

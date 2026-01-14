@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Upload, FileText, Save, Trash2, AlertCircle, Briefcase, Folder as FolderIcon, Lock } from 'lucide-react';
 import { DocType, DocStatus, Document, Folder, Attachment, Project } from '../types';
@@ -87,6 +86,26 @@ const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
 
   const removeFile = (id: string) => setUploadedFiles(prev => prev.filter(f => f.id !== id));
 
+  // ذكاء التبديل بين الأضابير والمشاريع
+  const handleProjectChange = (id: string) => {
+    setFormData(prev => {
+      // إذا كانت الإضبارة المختارة حالياً لا تنتمي للمشروع الجديد، قم بتصفيرها
+      const selectedFolder = folders.find(f => f.id === prev.folderId);
+      const folderInNewProject = selectedFolder?.projectId === id;
+      return { ...prev, projectId: id, folderId: folderInNewProject ? prev.folderId : '' };
+    });
+  };
+
+  const handleFolderChange = (id: string) => {
+    const folder = folders.find(f => f.id === id);
+    setFormData(prev => ({
+      ...prev,
+      folderId: id,
+      // إذا كانت الإضبارة تنتمي لمشروع، اختره تلقائياً
+      projectId: folder?.projectId || prev.projectId
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid) return;
@@ -128,6 +147,9 @@ const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
   };
 
   const currentFolder = folders.find(f => f.id === formData.folderId);
+  const availableFolders = formData.projectId 
+    ? folders.filter(f => f.projectId === formData.projectId) 
+    : folders;
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
@@ -178,16 +200,16 @@ const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mr-1 flex items-center gap-1"><Briefcase size={10}/> المشروع</label>
-              <select className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-bold text-xs" value={formData.projectId} onChange={e => setFormData({...formData, projectId: e.target.value})}>
+              <select className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-bold text-xs" value={formData.projectId} onChange={e => handleProjectChange(e.target.value)}>
                 <option value="">عام (بدون مشروع)</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div className="space-y-1">
               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mr-1 flex items-center gap-1"><FolderIcon size={10}/> الإضبارة</label>
-              <select className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-bold text-xs" value={formData.folderId} onChange={e => setFormData({...formData, folderId: e.target.value})}>
+              <select className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-bold text-xs" value={formData.folderId} onChange={e => handleFolderChange(e.target.value)}>
                 <option value="">بدون إضبارة</option>
-                {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                {availableFolders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
             </div>
           </div>
