@@ -83,27 +83,29 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!currentOrg || !currentUser) return;
 
-    // جلب المستندات
     const unsubDocs = onSnapshot(query(collection(db, "documents"), where("organizationId", "==", currentOrg.id)), 
-      (snapshot) => setDocuments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Document))));
+      (snapshot) => {
+        const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Document));
+        setDocuments(docs);
+        // تحديث الكتاب المفتوح إذا حصل عليه تغيير لحظي
+        if (currentDocument) {
+          const updated = docs.find(d => d.id === currentDocument.id);
+          if (updated) setCurrentDocument(updated);
+        }
+      });
     
-    // جلب الأضابير
     const unsubFolders = onSnapshot(query(collection(db, "folders"), where("organizationId", "==", currentOrg.id)), 
       (snapshot) => setFolders(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Folder))));
 
-    // جلب المشاريع (ترتيب حسب الأحدث)
     const unsubProjects = onSnapshot(query(collection(db, "projects"), where("organizationId", "==", currentOrg.id)), 
       (snapshot) => {
         const projs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Project));
-        // ترتيب المشاريع حسب التاريخ (الأحدث أولاً)
         const sortedProjs = [...projs].sort((a, b) => {
            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
            return dateB - dateA;
         });
         setProjects(sortedProjs);
-        
-        // فتح آخر مشروع تم إنشاؤه تلقائياً إذا لم يكن هناك مشروع مختار
         if (sortedProjs.length > 0 && selectedProjectId === 'all') {
           setSelectedProjectId(sortedProjs[0].id);
         }
@@ -118,7 +120,7 @@ const App: React.FC = () => {
     return () => {
       unsubDocs(); unsubFolders(); unsubProjects(); unsubUsers(); unsubDepts();
     };
-  }, [currentOrg, currentUser]);
+  }, [currentOrg, currentUser, currentDocument]);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -127,26 +129,40 @@ const App: React.FC = () => {
     setActiveTab('dashboard');
   };
 
-  // وظيفة "الخروج من المنشأة نهائياً"
   const handleLeaveOrganization = async () => {
     if (!currentUser) return;
     try {
-      // 1. تحديث مستند المستخدم في Firestore لمسح ارتباطه بالمنشأة
       const userRef = firestoreDoc(db, "users", currentUser.id);
       await updateDoc(userRef, {
         organizationId: "",
         role: "employee",
-        status: "pending", // سيعيده هذا إلى حالة الانتظار/الاختيار
+        status: "pending",
         department: "",
         permissions: []
       });
-
-      // 2. تسجيل الخروج من Firebase للعودة لصفحة الدخول
       await handleLogout();
     } catch (error) {
       console.error("Error leaving organization:", error);
-      alert("حدث خطأ أثناء محاولة الخروج من المنشأة.");
     }
+  };
+
+  const handleDuplicateDoc = async (docObj: Document) => {
+    const { id, ...rest } = docObj;
+    await addDoc(collection(db, "documents"), {
+      ...rest,
+      subject: `${docObj.subject} (نسخة)`,
+      refNumber: `${docObj.refNumber}-Copy`,
+      createdAt: serverTimestamp()
+    });
+  };
+
+  const handleDuplicateFolder = async (folderObj: Folder) => {
+    const { id, ...rest } = folderObj;
+    await addDoc(collection(db, "folders"), {
+      ...rest,
+      name: `${folderObj.name} (نسخة)`,
+      createdAt: new Date().toISOString()
+    });
   };
 
   if (authLoading) {
@@ -207,6 +223,10 @@ const App: React.FC = () => {
             onOpenUnit={(d) => { setCurrentDocument(d); setActiveView('details'); }}
             onDeleteDoc={(id) => setConfirmDelete({ id, type: 'doc' })}
             onDeleteFolder={(id) => setConfirmDelete({ id, type: 'folder' })}
+            onRenameDoc={(id, name) => updateDoc(firestoreDoc(db, "documents", id), { subject: name })}
+            onRenameFolder={(id, name) => updateDoc(firestoreDoc(db, "folders", id), { name })}
+            onDuplicateDoc={handleDuplicateDoc}
+            onDuplicateFolder={handleDuplicateFolder}
             selectedProjectId={selectedProjectId}
             setSelectedProjectId={setSelectedProjectId}
             activeFolderId={activeFolderId}

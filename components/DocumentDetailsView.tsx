@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   ChevronRight, Calendar, Hash, Building2, 
   FileText, Download, Info, MoreVertical, Trash2, 
   PlusCircle, Paperclip, Check, SendHorizontal, 
-  Clock, CheckSquare, X, Edit3, Mic, Video, Play, Headphones
+  Clock, CheckSquare, X, Edit3, Mic, Video, Play, Headphones,
+  Volume2, Music
 } from 'lucide-react';
 import { Document, Attachment, User as UserType, WorkflowTask, DocStatus } from '../types';
 import { updateDoc, doc as firestoreDoc } from 'firebase/firestore';
@@ -64,6 +65,11 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
     dueDate: '',
     instructions: ''
   });
+
+  // مزامنة الاسم المحلي مع التحديثات اللحظية من Firestore
+  useEffect(() => {
+    setEditSubject(doc.subject);
+  }, [doc.subject]);
 
   const canEdit = currentUser?.role === 'admin' || currentUser?.permissions?.includes('تعديل كتاب');
 
@@ -147,7 +153,7 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
   };
 
   const getFileIcon = (type: string) => {
-    if (type.startsWith('audio/')) return <Mic size={22} />;
+    if (type.startsWith('audio/')) return <Volume2 size={22} />;
     if (type.startsWith('video/')) return <Video size={22} />;
     return <FileText size={22} />;
   };
@@ -249,7 +255,7 @@ const DocumentDetailsView: React.FC<DocumentDetailsViewProps> = ({
                     <div key={file.id} className="group bg-slate-50 p-4 rounded-xl border border-slate-100 hover:bg-white hover:shadow-xl hover:border-emerald-100 transition-all flex items-center justify-between gap-3">
                        <div className="flex items-center gap-4 min-w-0 cursor-pointer flex-1" onClick={() => handlePreviewFile(file)}>
                           <div className={`p-2.5 rounded-xl shadow-sm transition-transform group-hover:scale-110 ${isAudio ? 'bg-indigo-600 text-white' : 'bg-white text-emerald-600'}`}>
-                             {isAudio ? <Headphones size={22} /> : getFileIcon(file.type)}
+                             {isAudio ? <Music size={22} /> : getFileIcon(file.type)}
                           </div>
                           <div className="overflow-hidden flex-1">
                              {editingFileId === file.id ? (

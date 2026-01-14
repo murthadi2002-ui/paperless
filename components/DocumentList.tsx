@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Search, FileText, FileDown, FileUp, MoreVertical, Paperclip, Folder as FolderIcon, FolderPlus, Trash2, Star, Copy, Edit3, Clock, Lock, ArrowRight, Filter } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { Search, FileText, FileDown, FileUp, MoreVertical, Paperclip, Folder as FolderIcon, FolderPlus, Trash2, Star, Copy, Edit3, Clock, Lock, ArrowRight, Filter, ChevronRight } from 'lucide-react';
 import { DocType, DocStatus, Document, Folder, Project, User } from '../types';
 import CreateFolderModal from './CreateFolderModal';
 
@@ -11,10 +11,10 @@ interface DocumentListProps {
   onOpenUnit: (doc: Document) => void;
   onDeleteDoc: (id: string) => void;
   onDeleteFolder: (id: string) => void;
+  onDuplicateDoc?: (doc: Document) => void;
+  onDuplicateFolder?: (folder: Folder) => void;
   onRenameDoc?: (id: string, name: string) => void;
   onRenameFolder?: (id: string, name: string) => void;
-  onDuplicateDoc?: (doc: Document) => void;
-  onTogglePin?: (id: string) => void;
   selectedProjectId: string;
   setSelectedProjectId: (id: string) => void;
   activeFolderId: string | null;
@@ -22,20 +22,54 @@ interface DocumentListProps {
   currentUser: User | null;
 }
 
+const ContextMenu: React.FC<{
+  x: number;
+  y: number;
+  onClose: () => void;
+  options: { label: string; icon: any; onClick: () => void; danger?: boolean }[];
+}> = ({ x, y, onClose, options }) => {
+  useEffect(() => {
+    const handleClick = () => onClose();
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, [onClose]);
+
+  return (
+    <div 
+      className="fixed z-[300] bg-white border border-slate-200 rounded-xl shadow-2xl py-2 w-48 animate-in fade-in zoom-in-95 origin-top-right overflow-hidden"
+      style={{ top: y, left: x - 192 }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {options.map((opt, i) => (
+        <button
+          key={i}
+          onClick={() => { opt.onClick(); onClose(); }}
+          className={`w-full flex items-center justify-between px-4 py-2.5 text-[11px] font-black transition-colors ${opt.danger ? 'text-red-600 hover:bg-red-50' : 'text-slate-700 hover:bg-slate-50'}`}
+        >
+          <span className="flex-1 text-right">{opt.label}</span>
+          <opt.icon size={14} className="mr-2" />
+        </button>
+      ))}
+    </div>
+  );
+};
+
 const DocumentList: React.FC<DocumentListProps> = ({ 
   documents, folders, projects, onAddFolder, onOpenUnit, onDeleteDoc, onDeleteFolder,
-  onRenameDoc, onRenameFolder, onDuplicateDoc, onTogglePin,
+  onDuplicateDoc, onDuplicateFolder, onRenameDoc, onRenameFolder,
   selectedProjectId, setSelectedProjectId, activeFolderId, setActiveFolderId, currentUser
 }) => {
   const [viewMode, setViewMode] = useState<'types' | 'folders' | 'confidential' | 'pinned'>('types');
   const [filterType, setFilterType] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
-  const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; type: 'doc' | 'folder'; id: string } | null>(null);
 
-  const canEdit = currentUser?.role === 'admin' || currentUser?.permissions?.includes('تعديل كتاب');
-  const canDelete = currentUser?.role === 'admin' || currentUser?.permissions?.includes('حذف كتاب');
-  const hasConfidentialAccess = currentUser?.role === 'admin' || currentUser?.permissions?.includes('عرض الوثائق السرية');
+  const handleContextMenu = (e: React.MouseEvent, type: 'doc' | 'folder', id: string) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, type, id });
+  };
 
   const filteredDocs = useMemo(() => {
     return documents.filter(doc => {
@@ -62,8 +96,45 @@ const DocumentList: React.FC<DocumentListProps> = ({
 
   const activeFolder = folders.find(f => f.id === activeFolderId);
 
+  const getContextMenuOptions = () => {
+    if (!contextMenu) return [];
+    
+    if (contextMenu.type === 'folder') {
+      const folder = folders.find(f => f.id === contextMenu.id);
+      return [
+        { label: 'فتح الإضبارة', icon: ChevronRight, onClick: () => setActiveFolderId(contextMenu.id) },
+        { label: 'إعادة تسمية', icon: Edit3, onClick: () => {
+          const newName = prompt('أدخل الاسم الجديد للإضبارة:', folder?.name);
+          if (newName && onRenameFolder) onRenameFolder(contextMenu.id, newName);
+        }},
+        { label: 'تكرار الإضبارة', icon: Copy, onClick: () => folder && onDuplicateFolder?.(folder) },
+        { label: 'حذف الإضبارة', icon: Trash2, danger: true, onClick: () => onDeleteFolder(contextMenu.id) }
+      ];
+    } else {
+      const doc = documents.find(d => d.id === contextMenu.id);
+      return [
+        { label: 'معاينة الكتاب', icon: FileText, onClick: () => doc && onOpenUnit(doc) },
+        { label: 'إعادة تسمية الموضوع', icon: Edit3, onClick: () => {
+          const newName = prompt('أدخل الموضوع الجديد:', doc?.subject);
+          if (newName && onRenameDoc) onRenameDoc(contextMenu.id, newName);
+        }},
+        { label: 'عمل نسخة (تكرار)', icon: Copy, onClick: () => doc && onDuplicateDoc?.(doc) },
+        { label: 'حذف الكتاب', icon: Trash2, danger: true, onClick: () => onDeleteDoc(contextMenu.id) }
+      ];
+    }
+  };
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 text-right" dir="rtl" onClick={() => setActiveMenu(null)}>
+    <div className="space-y-6 animate-in fade-in duration-500 text-right" dir="rtl">
+      {contextMenu && (
+        <ContextMenu 
+          x={contextMenu.x} 
+          y={contextMenu.y} 
+          onClose={() => setContextMenu(null)} 
+          options={getContextMenuOptions()} 
+        />
+      )}
+
       <CreateFolderModal 
         isOpen={isCreateFolderOpen} 
         onClose={() => setIsCreateFolderOpen(false)} 
@@ -83,7 +154,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
             <>
               <button onClick={() => { setViewMode('types'); setActiveFolderId(null); }} className={`pb-2 px-4 text-xs font-black transition-all border-b-2 whitespace-nowrap ${viewMode === 'types' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>الكتب المؤرشفة</button>
               <button onClick={() => { setViewMode('folders'); setActiveFolderId(null); }} className={`pb-2 px-4 text-xs font-black transition-all border-b-2 whitespace-nowrap ${viewMode === 'folders' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>الأضابير الموضوعية</button>
-              {hasConfidentialAccess && (
+              {currentUser?.role === 'admin' && (
                 <button onClick={() => { setViewMode('confidential'); setActiveFolderId(null); }} className={`pb-2 px-4 text-xs font-black transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${viewMode === 'confidential' ? 'border-red-600 text-red-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
                   <Lock size={14} /> وثائق سرية
                 </button>
@@ -123,7 +194,12 @@ const DocumentList: React.FC<DocumentListProps> = ({
            {filteredFolders.map(folder => {
              const docCount = documents.filter(d => d.folderId === folder.id).length;
              return (
-               <div key={folder.id} onClick={() => setActiveFolderId(folder.id)} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group flex flex-col items-center text-center relative">
+               <div 
+                  key={folder.id} 
+                  onContextMenu={(e) => handleContextMenu(e, 'folder', folder.id)}
+                  onClick={() => setActiveFolderId(folder.id)} 
+                  className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group flex flex-col items-center text-center relative"
+                >
                   <div className={`w-20 h-20 rounded-xl ${viewMode === 'confidential' ? 'bg-red-600' : (folder.color || 'bg-emerald-500')} text-white shadow-xl flex items-center justify-center mb-5 transition-transform duration-500`}>
                      {viewMode === 'confidential' ? <Lock size={36} fill="white" /> : <FolderIcon size={36} fill="white" />}
                   </div>
@@ -136,7 +212,12 @@ const DocumentList: React.FC<DocumentListProps> = ({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 animate-in fade-in duration-300">
           {filteredDocs.map((doc) => (
-            <div key={doc.id} onClick={() => onOpenUnit(doc)} className="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer flex flex-col aspect-square relative overflow-hidden">
+            <div 
+              key={doc.id} 
+              onContextMenu={(e) => handleContextMenu(e, 'doc', doc.id)}
+              onClick={() => onOpenUnit(doc)} 
+              className="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer flex flex-col aspect-square relative overflow-hidden"
+            >
               <div className="flex justify-between items-start mb-4">
                 <div className={`p-2.5 rounded-xl ${doc.isConfidential ? 'bg-red-50 text-red-600' : (doc.type === DocType.INCOMING ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600 shadow-inner')}`}>
                   {doc.type === DocType.INCOMING ? <FileDown size={20} /> : <FileUp size={20} />}
